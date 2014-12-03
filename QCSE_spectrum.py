@@ -10,17 +10,19 @@ import matplotlib.pyplot as plt
 import libtiff
 import matplotlib.animation as animation 
 from sub import point, lambda_cali
+from scipy.ndimage.filters import gaussian_filter1d
+from scipy.optimize import curve_fit
 plt.close("all")
 
-filePath='/Users/yung/111414 QCSE/'
-fileName='100617G-90V-5'
+filePath='/Users/yung/120114QCSE/'
+fileName='619D.120V-14'
 
 mov = libtiff.TiffFile(filePath+fileName+'.tif')
 movie = mov.get_tiff_array()
 movie=np.array(movie[:,:,:],dtype='d')
 
 backGND_corr = 1          # 1 = apply correction, else = no correction
-Photobleaching_corr = 0   # 1 = apply correction, else = no correction
+Time_corr = 1   # 1 = apply polynomial fit, 2 = apply Gaussian filter, else = no correction
 frame=len(movie[:,0,0])
 row=len(movie[0,:,0])
 col=len(movie[0,0,:])
@@ -31,11 +33,11 @@ T = np.arange(0,t,dt)
 T_3d = np.tile(T[:,np.newaxis,np.newaxis],(1,row,col))
 movie[0:frame_start,:,:]=movie[frame_start,:,:]
 scan_w=3     # extract 3*2+1=7 pixels in width(perpendicular to spectral diffusion line) around QD
-scan_l=45    # extract 45*2+1=91 pixels in length = spectral width
+scan_l=55    # extract 45*2+1=91 pixels in length = spectral width
 x = np.arange(0,col,1)
-polydeg = 9
+polydeg = 7
 polydeg_bg = 9
-polydeg_pb = 1
+polydeg_pb = 4
 
 
 
@@ -43,16 +45,16 @@ polydeg_pb = 1
 """
 Calibration of wavelength
 """
-cali1 = plt.imread('/Users/yung/111414 QCSE/calibration2.tif')
-cali2 = plt.imread('/Users/yung/111414 QCSE/calibration.tif')
-refimg = cali1+cali2
+cali1 = plt.imread(filePath+'calibration2.tif')
+cali2 = plt.imread(filePath+'calibration.tif')
+refimg = cali1*100+cali2
 x_lambda = lambda_cali.lambda_cali(refimg)
 plt.savefig(filePath+fileName+'fig1.pdf', format='pdf')
 
 
 
 """
-Background and photobleaching correction
+Background and Gaussian filter correction
 """
 
 abs_I_diff=np.zeros((row, col))
@@ -93,18 +95,22 @@ window_size=10
 
 #p=movingaverage(bg,window_size)
 
-bg_3d=np.tile(p[np.newaxis,np.newaxis,:],(frame,row,1))
-movie_bgcr=movie[:,:,:]-bg_3d
-movie_bgcr1=np.sum(np.sum(movie_bgcr,axis=0),axis=0)/(row*frame)
-movie_t=np.sum(np.sum(movie_bgcr,axis=1),axis=1)/(row*col)
-movie_pb=movingaverage(movie_t,window_size)
-pb_constant=np.polyfit(T[frame_start:len(T)-window_size:1],movie_pb[frame_start:len(T)-window_size:1],polydeg_pb)
-pbleach=np.polyval(pb_constant,T)
-pbc=pb_constant[1]/pbleach
+bg_3d = np.tile(p[np.newaxis,np.newaxis,:],(frame,row,1))
+movie_bgcr = movie[:,:,:]-bg_3d
+movie_bgcr1 = np.sum(np.sum(movie_bgcr,axis=0),axis=0)/(row*frame)
+movie_t = np.sum(np.sum(movie_bgcr,axis=1),axis=1)/(row*col)
+#movie_pb = movingaverage(movie_t,window_size)
+pb_constant = np.polyfit(T[frame_start:len(T)-window_size:1],movie_t[frame_start:len(T)-window_size:1],polydeg_pb)
+pbleach = np.polyval(pb_constant,T)
+#pbc = pb_constant[1]/pbleach
+
+gaufil = gaussian_filter1d(movie_bgcr, sigma=20, axis=0)
+movie_fil = movie_bgcr-gaufil
+movie_fil_t = np.sum(np.sum(movie_fil,axis=1),axis=1)/(row*col)
 
 fig,(ax,ax2,ax3)=plt.subplots(3,1,sharex=False)
 
-line_sbg=ax.plot(x, p,'m',label='smoothen bg')
+line_sbg=ax.plot(x, p,'m',label='polyfit({}) bg'.format(polydeg_bg))
 line_bg=ax.plot(x, bg,'c',label='bg')
 ax.set_title('Background')
 ax.set_xlabel('pixels')
@@ -119,27 +125,32 @@ handles, labels = ax2.get_legend_handles_labels()
 ax2.legend(handles, labels, bbox_to_anchor=(0.93, 1), loc=2, borderaxespad=0, fontsize=12)
 ax2.annotate('Background correction={}'.format(backGND_corr),xy=(0,0), xytext=(0.7,0.1), xycoords='axes fraction', fontsize=10)
 
-line_smoothen, = ax3.plot(T[frame_start:len(T)-window_size:1],movie_pb[frame_start:len(T)-window_size:1], label="Smoothen I")
-line_pbleaching, = ax3.plot(T[frame_start:len(T)-window_size:1],pbleach[frame_start:len(T)-window_size:1], label="Photobleaching")
-line_pb_correct_I, = ax3.plot(T[frame_start:len(T)-window_size:1],np.multiply(movie_pb,pbc)[frame_start:len(T)-window_size:1], label="P.B. corrected I")
-ax3.set_title('Photobleaching correction')
+ax3.plot(T[frame_start:len(T)-window_size:1],movie_t[frame_start:len(T)-window_size:1], label='original I')
+ax3.plot(T[frame_start:len(T)-window_size:1],pbleach[frame_start:len(T)-window_size:1], label='polyfit({})'.format(polydeg_pb))
+ax3.plot(T[frame_start:len(T)-window_size:1],np.multiply(movie_t, 1/pbleach)[frame_start:len(T)-window_size:1], label='I- polyfit=1')
+ax3.plot(T[frame_start:len(T)-window_size:1],movie_fil_t[frame_start:len(T)-window_size:1], label='high pass filter=2')
+ax3.set_title('Time trace correction')
 handles, labels = ax3.get_legend_handles_labels()
 ax3.legend(handles, labels,bbox_to_anchor=(0.93, 1), loc=2, borderaxespad=0, fontsize=12)
 ax3.set_xlabel('time (s)')
-ax3.annotate('Photobleaching correction={}'.format(Photobleaching_corr),xy=(0,0), xytext=(0.65,0.1), xycoords='axes fraction', fontsize=10)
+ax3.annotate('Time correction={}'.format(Time_corr),xy=(0,0), xytext=(0.7,0.1), xycoords='axes fraction', fontsize=10)
 plt.show()
 plt.savefig(filePath+fileName+'fig3.pdf', format='pdf', bbox_inches = 'tight')    
     
     
 if backGND_corr == 1:
-    if Photobleaching_corr == 1:
-        mov_f=np.zeros((frame,row,col))
+    if Time_corr == 1:
+        mov_f = np.zeros((frame,row,col))
         for i in range(frame):
-            mov_f[i,:,:]=movie_bgcr[i,:,:]*pbc[i] 
+            mov_f[i,:,:] = movie_bgcr[i,:,:]-pbleach[i] 
+    elif Time_corr ==2:
+        mov_f = movie_fil
     else: 
         mov_f=movie_bgcr
 else:
     mov_f=movie
+
+
 
 fig=plt.figure()
 ims = []
@@ -168,14 +179,20 @@ pts = point.pIO(mov_f, ax, fig)
 pts = np.array(pts)
 pts_new = point.localmax(abs_I_diff, pts, ax, fig)
 npoint = np.size(pts_new[:,0])
-ax.plot((pts[:,1]+scan_l, pts[:,1]-scan_l, pts[:,1]-scan_l,pts[:,1]+scan_l,pts[:,1]+scan_l), (pts[:,0]-scan_w, pts[:,0]-scan_w, pts[:,0]+scan_w, pts[:,0]+scan_w,pts[:,0]-scan_w), '-+', color='b')
+ax.plot((pts_new[:,1]+scan_l, pts_new[:,1]-scan_l, pts_new[:,1]-scan_l,pts_new[:,1]+scan_l,pts_new[:,1]+scan_l), (pts_new[:,0]-scan_w, pts_new[:,0]-scan_w, pts_new[:,0]+scan_w, pts_new[:,0]+scan_w,pts_new[:,0]-scan_w), '-+', color='b')
 plt.savefig(filePath+fileName+'fig4.pdf', format='pdf')
 
 """
-Extracting spectra from 7 X 71 pixels around points of interest 
+Extracting spectra from 7 X 91 pixels around points of interest 
 Thresholding
 Fit spectra when voltage is on and off, respectively.
 """
+def gauss(x, *p):
+    A, mu, sigma, slope, b = p
+    return A*np.exp(-(x-mu)**2/(2.*sigma**2))+slope*x+b
+
+
+
 box_intensity = np.zeros((frame,npoint))
 spectra = np.zeros((frame,2*scan_l+1,npoint))
 fig, axarr = plt.subplots(npoint*2,1, sharex=True)
@@ -188,7 +205,7 @@ for n in range(npoint):
 
 
     std5 = np.std(box_intensity[frame_start:,n],axis=0,ddof=1,dtype='d')/5
-    thre_constant = box_intensity[frame_start:,n].mean()-std5   
+    thre_constant = box_intensity[frame_start:,n].mean()-std5
     threshold = np.tile(thre_constant,frame)     
     
     axarr[n*2].imshow(np.transpose(spectra[:,:,n]), cmap='gray')
@@ -211,6 +228,16 @@ for n in range(npoint):
 
     Von_avg = np.mean(Von_spec, axis=0)    
     Voff_avg = np.mean(Voff_spec, axis=0)
+    
+    slope1 = (np.mean(Von_avg[int(len(Von_avg)-len(Von_avg)/10):len(Von_avg):1])-np.mean(Von_avg[0:int(len(Von_avg)/10):1]))/(x_lambda[pts_new[n,1]+scan_l+1]-x_lambda[pts_new[n,1]-scan_l])
+    slope2 = (np.mean(Voff_avg[int(len(Voff_avg)-len(Voff_avg)/10):len(Voff_avg):1])-np.mean(Voff_avg[0:int(len(Voff_avg)/10):1]))/(x_lambda[pts_new[n,1]+scan_l+1]-x_lambda[pts_new[n,1]-scan_l])
+    p01 = [np.max(Von_avg), x_lambda[pts_new[n,1]-scan_l+int(*np.where(Von_avg == Von_avg.max()))] , 10, slope1, np.min(Von_avg)]
+    p02 = [np.max(Voff_avg), x_lambda[pts_new[n,1]-scan_l+int(*np.where(Voff_avg == Voff_avg.max()))] , 10, slope2, np.min(Voff_avg)]    
+    coeff1, var_matrix1 = curve_fit(gauss, x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1], Von_avg, p0=p01)
+    coeff2, var_matrix2 = curve_fit(gauss, x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1], Voff_avg, p0=p02)    
+    Von_avg_gfit = gauss(x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1], *coeff1)
+    Voff_avg_gfit = gauss(x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1], *coeff2)
+
     Von_avg_fit = np.polyfit(x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1],Von_avg,polydeg)
     Voff_avg_fit = np.polyfit(x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1],Voff_avg,polydeg)
     Von_avg_p = np.polyval(Von_avg_fit, x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1])
@@ -218,54 +245,98 @@ for n in range(npoint):
     Von_avg_peak = x_lambda[pts_new[n,1]-scan_l+int(*np.where(Von_avg_p == Von_avg_p.max()))] 
     Voff_avg_peak = x_lambda[pts_new[n,1]-scan_l+int(*np.where(Voff_avg_p == Voff_avg_p.max()))]
    
-   
- 
-    #fit every single frame
-    Von_fit = np.polyfit(x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1], np.transpose(Von_spec), polydeg)
-    Voff_fit = np.polyfit(x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1], np.transpose(Voff_spec), polydeg)
+    Von_avg_gpeak = x_lambda[pts_new[n,1]-scan_l+int(*np.where(Von_avg_gfit == Von_avg_gfit.max()))] 
+    Voff_avg_gpeak = x_lambda[pts_new[n,1]-scan_l+int(*np.where(Voff_avg_gfit == Voff_avg_gfit.max()))]
+      
 
-    Von_p = []
-    Voff_p = []  
-    Von_peak = []
-    Voff_peak = []
-    
-    for j in range(len(Von_fit[0,:])):    
-        a = np.polyval(Von_fit[:,j], x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1])        
-        a_max = x_lambda[pts_new[n,1]-scan_l+int(*np.where(a == a.max()))]        
-        #Von_p = np.append(Von_p, a, axis=0)
-        Von_peak = np.append(Von_peak, a_max)
-        
-    #Von_p = Von_p.reshape(len(Von_fit[0,:]), scan_l*2+1)
-    Von_peak = Von_peak.reshape(len(Von_fit[0,:]), 1)
-    
-    for k in range(len(Voff_fit[0,:])): 
-        b = np.polyval(Voff_fit[:,k], x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1])
-        b_max = x_lambda[pts_new[n,1]-scan_l+int(*np.where(b == b.max()))]        
-        #Voff_p = np.append(Voff_p, b,axis=0)
-        Voff_peak = np.append(Voff_peak, b_max)
-    #Voff_p = Voff_p.reshape(len(Voff_fit[0,:]), scan_l*2+1)
-    Voff_peak = Voff_peak.reshape(len(Voff_fit[0,:]), 1)
+    #fit Gaussian to every single frame
 
+    Von_gpeak = []
+    for j in range(len(Von_spec[:,0])):     
+        slopes1 = (np.mean(Von_spec[j,scan_l*2+1-10:])-np.mean(Von_spec[j,0:10]))/(x_lambda[pts_new[n,1]+scan_l+1]-x_lambda[pts_new[n,1]-scan_l])
+        ps01 = [np.max(Von_spec[j,:]), x_lambda[pts_new[n,1]-scan_l+int(*np.where(Von_spec[j,:] == Von_spec[j,:].max()))] , 10, slopes1, np.min(Von_spec[j,:])]
+        try:        
+            coeffs1, var_matrixs1 = curve_fit(gauss, x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1], Von_spec[j,:], p0=ps01)
+        except RuntimeError:
+            print('Error - {}Von_curve_fit failed'.format(j))
+        Von_gfit = gauss(x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1], *coeffs1)
+        Von_gfit_max = x_lambda[int(pts_new[n,1]-scan_l+int(*np.where(Von_gfit == np.max(Von_gfit))))]
+        Von_gpeak = np.append(Von_gpeak, Von_gfit_max)
+        #fig, ax = plt.subplots()
+        #ax.plot(x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1], Von_gfit, 'b-')
+        #ax.plot(x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1], Von_spec[j,:], 'bo')
+    Von_gpeak = Von_gpeak.reshape(len(Von_spec[:,0]), 1)
+    
+    Voff_gpeak = []
+    for k in range(len(Voff_spec[:,0])):     
+        slopes2 = (np.mean(Voff_spec[k,scan_l*2+1-10:])-np.mean(Voff_spec[k,0:10]))/(x_lambda[pts_new[n,1]+scan_l+1]-x_lambda[pts_new[n,1]-scan_l])
+        ps02 = [np.max(Voff_spec[k,:]), x_lambda[pts_new[n,1]-scan_l+int(*np.where(Voff_spec[k,:] == Voff_spec[k,:].max()))] , 10, slopes2, np.min(Voff_spec[k,:])]
+        try:            
+            coeffs2, var_matrixs2 = curve_fit(gauss, x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1], Voff_spec[k,:], p0=ps02)
+        except RuntimeError:
+            print('Error - {}Voff_curve_fit failed'.format(k))
+        Voff_gfit = gauss(x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1], *coeffs2)
+        Voff_gfit_max = x_lambda[int(pts_new[n,1]-scan_l+int(*np.where(Voff_gfit == np.max(Voff_gfit))))]
+        Voff_gpeak = np.append(Voff_gpeak, Voff_gfit_max)
+    Voff_gpeak = Voff_gpeak.reshape(len(Voff_spec[:,0]), 1)
+
+
+#    #fit polynomial to every single frame
+#    Von_fit = np.polyfit(x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1], np.transpose(Von_spec), polydeg)
+#    Voff_fit = np.polyfit(x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1], np.transpose(Voff_spec), polydeg)
+
+#    Von_p = []
+#    Voff_p = []  
+#    Von_peak = []
+#    Voff_peak = []
+#    
+#    for j in range(len(Von_fit[0,:])):    
+#        a = np.polyval(Von_fit[:,j], x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1])        
+#        a_max = x_lambda[pts_new[n,1]-scan_l+int(*np.where(a == a.max()))]        
+#        #Von_p = np.append(Von_p, a, axis=0)
+#        Von_peak = np.append(Von_peak, a_max)
+#        
+#    #Von_p = Von_p.reshape(len(Von_fit[0,:]), scan_l*2+1)
+#    Von_peak = Von_peak.reshape(len(Von_fit[0,:]), 1)
+#    
+#    for k in range(len(Voff_fit[0,:])): 
+#        b = np.polyval(Voff_fit[:,k], x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1])
+#        b_max = x_lambda[pts_new[n,1]-scan_l+int(*np.where(b == b.max()))]        
+#        #Voff_p = np.append(Voff_p, b,axis=0)
+#        Voff_peak = np.append(Voff_peak, b_max)
+#    #Voff_p = Voff_p.reshape(len(Voff_fit[0,:]), scan_l*2+1)
+#    Voff_peak = Voff_peak.reshape(len(Voff_fit[0,:]), 1)
 
     
     axarr2[n,0].plot(x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1], Von_avg, 'bo', fillstyle='none')
-    axarr2[n,0].plot(x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1], Von_avg_p, 'b-', label='Von polyfit={}'.format(polydeg))
+    #axarr2[n,0].plot(x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1], Von_avg_p, 'b-', label='Von polyfit={}'.format(polydeg))
+    axarr2[n,0].plot(x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1], Von_avg_gfit, 'b-', label='Von gsnfit')    
     axarr2[n,0].plot(x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1], Voff_avg, 'ro', fillstyle='none')
-    axarr2[n,0].plot(x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1], Voff_avg_p, 'r-', label='Voff polyfit={}'.format(polydeg))
+    #axarr2[n,0].plot(x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1], Voff_avg_p, 'r-', label='Voff polyfit={}'.format(polydeg))
+    axarr2[n,0].plot(x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l+1:1], Voff_avg_gfit, 'r-', label='Voff gsnfit')    
     axarr2[n,0].set_xlim([x_lambda[pts_new[n,1]-scan_l],x_lambda[pts_new[n,1]+scan_l+1]])    
     handles, labels = axarr2[n,0].get_legend_handles_labels()    
-    axarr2[n,0].legend(handles, labels,bbox_to_anchor=(0.55, 0.2), loc=2, borderaxespad=0, fontsize=8)
-    axarr2[n,0].annotate(r'$\Delta\lambda=${}nm'.format(round(Von_avg_peak-Voff_avg_peak,3)),xy=(0,0), xytext=(0.3,0.9), xycoords='axes fraction', fontsize=12) 
-    axarr2[n,0].annotate(r'$Von \lambda=${}nm'.format(round(Von_avg_peak,1)),xy=(Von_avg_peak,0), xytext=(0.6,0.3), xycoords='axes fraction', fontsize=10)    
-    axarr2[n,0].annotate(r'$Voff \lambda=${}nm'.format(round(Voff_avg_peak,1)),xy=(Voff_avg_peak,0), xytext=(0.6,0.23), xycoords='axes fraction', fontsize=10)    
+    axarr2[n,0].legend(handles, labels,bbox_to_anchor=(0.7, 1), loc=2, borderaxespad=0, fontsize=10)
+    #axarr2[n,0].annotate('Polynomial', xytext=(0.7,1), xy=(Von_avg_peak,0), xycoords='axes fraction', fontsize=12)     
+    #axarr2[n,0].annotate(r'$\Delta\lambda=${}nm'.format(round(Von_avg_peak-Voff_avg_peak,3)),xy=(0,0), xytext=(0.7,0.9), xycoords='axes fraction', fontsize=12) 
+    #axarr2[n,0].annotate(r'$Von \lambda=${}nm'.format(round(Von_avg_peak,1)),xy=(Von_avg_peak,0), xytext=(0.7,0.8), xycoords='axes fraction', fontsize=10)    
+    #axarr2[n,0].annotate(r'$Voff \lambda=${}nm'.format(round(Voff_avg_peak,1)),xy=(Voff_avg_peak,0), xytext=(0.7,0.7), xycoords='axes fraction', fontsize=10)    
+    #axarr2[n,0].annotate('Gaussian', xytext=(0,1), xy=(Von_avg_peak,0), xycoords='axes fraction', fontsize=12)     
+    axarr2[n,0].annotate(r'$\Delta\lambda=${}nm'.format(round(Von_avg_gpeak-Voff_avg_gpeak,3)),xy=(0,0), xytext=(0,0.9), xycoords='axes fraction', fontsize=10) 
+    axarr2[n,0].annotate(r'$Von \lambda=${}nm'.format(round(Von_avg_gpeak,1)),xy=(Von_avg_gpeak,0), xytext=(0,0.8), xycoords='axes fraction', fontsize=10)    
+    axarr2[n,0].annotate(r'$Voff \lambda=${}nm'.format(round(Voff_avg_gpeak,1)),xy=(Voff_avg_gpeak,0), xytext=(0,0.7), xycoords='axes fraction', fontsize=10)    
+   
+
     
     
-    axarr2[n,1].hist(Von_peak, bins=20, color='b', histtype='stepfilled',alpha=0.5, label='Von')
-    axarr2[n,1].hist(Voff_peak, bins=20, color='r', histtype='stepfilled',alpha=0.5, label='Voff')
+    #axarr2[n,1].hist(Von_peak, bins=len(Von_peak)/3, color='b', histtype='stepfilled',alpha=0.5, label='Von')
+    #axarr2[n,1].hist(Voff_peak, bins=len(Voff_peak)/3, color='r', histtype='stepfilled',alpha=0.5, label='Voff')
+    axarr2[n,1].hist(Von_gpeak, bins=len(Von_gpeak)/3, color='b', histtype='stepfilled',alpha=0.5, label='Von gsn')
+    axarr2[n,1].hist(Voff_gpeak, bins=len(Voff_gpeak)/3, color='r', histtype='stepfilled',alpha=0.5, label='Voff gsn')
     axarr2[n,1].set_xlim([x_lambda[pts_new[n,1]-scan_l],x_lambda[pts_new[n,1]+scan_l+1]])    
     handles, labels = axarr2[n,1].get_legend_handles_labels()    
-    axarr2[n,1].legend(handles, labels,bbox_to_anchor=(0.9, 1), loc=2, borderaxespad=0, fontsize=12)
+    axarr2[n,1].legend(handles, labels,bbox_to_anchor=(0.7, 1), loc=2, borderaxespad=0, fontsize=10)
 fig.savefig(filePath+fileName+'fig5.pdf', format='pdf')
-fig2.savefig(filePath+fileName+'fig6.pdf', format='pdf')
+fig2.savefig(filePath+fileName+'fig6.pdf', format='pdf', bbox_inches = 'tight')
   
 
