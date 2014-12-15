@@ -14,8 +14,13 @@ from scipy.ndimage.filters import gaussian_filter1d
 from scipy.optimize import curve_fit
 plt.close("all")
 
+<<<<<<< HEAD
 filePath='E:/QCSE data/'
 fileName='617E-120V-2'
+=======
+filePath='/Users/yung/121414QCSE/'
+fileName='617E-120V-4'
+>>>>>>> origin/master
 
 mov = libtiff.TiffFile(filePath+fileName+'.tif')
 movie = mov.get_tiff_array()
@@ -37,7 +42,7 @@ scan_l=35    # extract 45*2+1=91 pixels in length = spectral width
 x = np.arange(0,col,1)
 polydeg = 7
 polydeg_bg = 9
-polydeg_pb = 4
+polydeg_pb = 8
 
 
 
@@ -49,7 +54,7 @@ cali1 = plt.imread(filePath+'calibration2.tif')
 cali2 = plt.imread(filePath+'calibration.tif')
 refimg = cali1+cali2*1
 x_lambda = lambda_cali.lambda_cali(refimg)
-plt.savefig(filePath+fileName+'fig1.pdf', format='pdf')
+#plt.savefig(filePath+fileName+'e.fig1.pdf', format='pdf')
 
 
 
@@ -78,7 +83,7 @@ ax.plot(x,np.tile(np.array(row_pt-scan_w+1), col),c='w')
 ax.set_xlim([0,col])
 ax.set_ylim([row,0])
 fig.canvas.draw()
-plt.savefig(filePath+fileName+'fig2.pdf', format='pdf')
+#plt.savefig(filePath+fileName+'e.fig2.pdf', format='pdf')
 bg = np.sum(np.sum(movie[:,row_pt-scan_w:row_pt+scan_w+1,:],axis=0),axis=0)/((scan_w*2+1)*frame)
 
 
@@ -104,7 +109,7 @@ pb_constant = np.polyfit(T[frame_start:len(T)-window_size:1],movie_t[frame_start
 pbleach = np.polyval(pb_constant,T)
 #pbc = pb_constant[1]/pbleach
 
-gaufil = gaussian_filter1d(movie_bgcr, sigma=20, axis=0)
+gaufil = gaussian_filter1d(movie_bgcr, sigma=80, axis=0)
 movie_fil = movie_bgcr-gaufil
 movie_fil_t = np.sum(np.sum(movie_fil,axis=1),axis=1)/(row*col)
 
@@ -135,7 +140,7 @@ ax3.legend(handles, labels,bbox_to_anchor=(0.93, 1), loc=2, borderaxespad=0, fon
 ax3.set_xlabel('time (s)')
 ax3.annotate('Time correction={}'.format(Time_corr),xy=(0,0), xytext=(0.7,0.1), xycoords='axes fraction', fontsize=10)
 plt.show()
-plt.savefig(filePath+fileName+'fig3.pdf', format='pdf', bbox_inches = 'tight')    
+#plt.savefig(filePath+fileName+'e.fig3.pdf', format='pdf', bbox_inches = 'tight')    
     
     
 if backGND_corr == 1:
@@ -152,14 +157,14 @@ else:
 
 
 
-fig=plt.figure()
-ims = []
-for i in range(frame):
-    im=plt.imshow(mov_f[i,:,:],vmin=mov_f.min(),vmax=mov_f.max(),cmap='hot')
-    ims.append([im]) 
-ani = animation.ArtistAnimation(fig, ims, interval=dt, blit=True,
-    repeat_delay=1000)
-plt.title('movie')  
+#fig=plt.figure()
+#ims = []
+#for i in range(frame):
+#    im=plt.imshow(mov_f[i,:,:],vmin=mov_f.min(),vmax=mov_f.max(),cmap='hot')
+#     ims.append([im]) 
+#ani = animation.ArtistAnimation(fig, ims, interval=dt, blit=True,
+#    repeat_delay=1000)
+#plt.title('movie')  
 
 newim=np.zeros((row,col))
 for i in range(frame-1):       
@@ -180,7 +185,7 @@ pts = np.array(pts)
 pts_new = point.localmax(abs_I_diff, pts, ax, fig)
 npoint = np.size(pts_new[:,0])
 ax.plot((pts_new[:,1]+scan_l, pts_new[:,1]-scan_l, pts_new[:,1]-scan_l,pts_new[:,1]+scan_l,pts_new[:,1]+scan_l), (pts_new[:,0]-scan_w, pts_new[:,0]-scan_w, pts_new[:,0]+scan_w, pts_new[:,0]+scan_w,pts_new[:,0]-scan_w), '-+', color='b')
-plt.savefig(filePath+fileName+'fig4.pdf', format='pdf')
+#plt.savefig(filePath+fileName+'e.fig4.pdf', format='pdf')
 
 """
 Extracting spectra from 7 X 91 pixels around points of interest 
@@ -194,23 +199,50 @@ def gauss(x, *p):
 
 
 box_intensity = np.zeros((frame,npoint))
+box_gaufil = np.zeros((frame,npoint))
+box_bgcr = np.zeros((frame,npoint))
+box_origin = np.zeros((frame,npoint))
 spectra = np.zeros((frame,2*scan_l+1,npoint))
-fig, axarr = plt.subplots(npoint*2,1, sharex=True)
+boxmovie = np.zeros((frame,2*scan_w+1,2*scan_l+1,npoint))
+fig, axarr = plt.subplots(npoint*2,1, sharex=True, sharey=False)
 fig2, axarr2 = plt.subplots(npoint,2)
-for n in range(npoint):
+fig3, axarr3 = plt.subplots(npoint)
+
+for n in range(npoint):   
     for i in range(frame):
-        temp = point.mask(mov_f[i,:,:], pts_new[n,:], scan_w, scan_l)
-        spectra[i,:,n] = np.mean(temp, axis=0)
-        box_intensity[i,n] = temp.sum()/((scan_w*2+1)*(scan_l*2+1)) 
+        boxmovie[i,:,:,n]  = point.mask(mov_f[i,:,:], pts_new[n,:], scan_w, scan_l)
+        spectra[i,:,n] = np.mean(boxmovie[i,:,:,n] , axis=0)        
+        
+        box_intensity[i,n] = np.sum(np.sum(boxmovie[i,:,:,n], axis=0),axis=0)/((scan_w*2+1)*(scan_l*2+1)) 
+    
+        tempg = point.mask(gaufil[i,:,:], pts_new[n,:], scan_w, scan_l)
+        box_gaufil[i,n] = tempg.sum()/((scan_w*2+1)*(scan_l*2+1))
+        
+        tempbgcr = point.mask(movie_bgcr[i,:,:], pts_new[n,:], scan_w, scan_l)
+        box_bgcr[i,n] = tempbgcr.sum()/((scan_w*2+1)*(scan_l*2+1))        
+        
+        tempo = point.mask(movie[i,:,:], pts_new[n,:], scan_w, scan_l)
+        box_origin[i,n] = tempo.sum()/((scan_w*2+1)*(scan_l*2+1))  
+    
+    
+    
+    ims = []
+    for i in range(frame):
+        im=axarr3[n].imshow(boxmovie[i,:,:,n],vmin=boxmovie[:,:,:,n].min(),vmax=boxmovie[:,:,:,n].max(),cmap='hot')
+        ims.append([im]) 
+    ani = animation.ArtistAnimation(fig3, ims, interval=dt, blit=True,repeat_delay=1000)
+    
 
-
-    std5 = np.std(box_intensity[frame_start:,n],axis=0,ddof=1,dtype='d')/5
-    thre_constant = box_intensity[frame_start:,n].mean()-std5
+    std = np.std(box_intensity[frame_start:,n],axis=0,ddof=1,dtype='d')
+    thre_constant = box_intensity[frame_start:,n].mean()-std/2
     threshold = np.tile(thre_constant,frame)     
     
     axarr[n*2].imshow(np.transpose(spectra[:,:,n]), cmap='gray')
     axarr[n*2+1].plot(np.arange(0,frame,1,dtype='int'),box_intensity[:,n], 'b')
-    axarr[n*2+1].plot(np.arange(0,frame,1,dtype='int'),threshold, 'r')    
+    axarr[n*2+1].plot(np.arange(0,frame,1,dtype='int'),threshold, 'r')
+    #axarr[n*2+1].plot(np.arange(0,frame,1,dtype='int'),box_gaufil[:,n], 'g')
+    #axarr[n*2+1].plot(np.arange(0,frame,1,dtype='int'),box_bgcr[:,n], 'c')
+    #axarr[n*2+1].plot(np.arange(0,frame,1,dtype='int'),box_origin[:,n], 'y')
     axarr[n*2+1].set_xlim([0,300])
     axarr[n*2+1].set_xlabel('frame')    
         
@@ -336,7 +368,14 @@ for n in range(npoint):
     axarr2[n,1].set_xlim([x_lambda[pts_new[n,1]-scan_l],x_lambda[pts_new[n,1]+scan_l+1]])    
     handles, labels = axarr2[n,1].get_legend_handles_labels()    
     axarr2[n,1].legend(handles, labels,bbox_to_anchor=(0.7, 1), loc=2, borderaxespad=0, fontsize=10)
-fig.savefig(filePath+fileName+'fig5.pdf', format='pdf')
-fig2.savefig(filePath+fileName+'fig6.pdf', format='pdf', bbox_inches = 'tight')
-  
+#fig.savefig(filePath+fileName+'e.fig5.pdf', format='pdf')
+#fig2.savefig(filePath+fileName+'e.fig6.pdf', format='pdf', bbox_inches = 'tight')
+
+ims = []
+for i in range(frame):
+    im=axarr3[n].imshow(boxmovie[i,:,:,1],vmin=boxmovie[:,:,:,n].min(),vmax=boxmovie[:,:,:,n].max(),cmap='hot')
+    ims.append([im]) 
+ani = animation.ArtistAnimation(fig3, ims, interval=dt, blit=True,repeat_delay=1000)
+writer = animation.writers['ffmpeg'](fps=1/dt)
+ani.save(filePath+'movie1.mp4',writer=writer,dpi=100)
 
