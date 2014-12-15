@@ -14,8 +14,8 @@ from scipy.ndimage.filters import gaussian_filter1d
 from scipy.optimize import curve_fit
 plt.close("all")
 
-filePath='/Users/yung/120114QCSE/'
-fileName='619D.120V-14'
+filePath='E:/QCSE data/'
+fileName='617E-120V-2'
 
 mov = libtiff.TiffFile(filePath+fileName+'.tif')
 movie = mov.get_tiff_array()
@@ -33,7 +33,7 @@ T = np.arange(0,t,dt)
 T_3d = np.tile(T[:,np.newaxis,np.newaxis],(1,row,col))
 movie[0:frame_start,:,:]=movie[frame_start,:,:]
 scan_w=3     # extract 3*2+1=7 pixels in width(perpendicular to spectral diffusion line) around QD
-scan_l=55    # extract 45*2+1=91 pixels in length = spectral width
+scan_l=35    # extract 45*2+1=91 pixels in length = spectral width
 x = np.arange(0,col,1)
 polydeg = 7
 polydeg_bg = 9
@@ -47,7 +47,7 @@ Calibration of wavelength
 """
 cali1 = plt.imread(filePath+'calibration2.tif')
 cali2 = plt.imread(filePath+'calibration.tif')
-refimg = cali1*100+cali2
+refimg = cali1+cali2*1
 x_lambda = lambda_cali.lambda_cali(refimg)
 plt.savefig(filePath+fileName+'fig1.pdf', format='pdf')
 
