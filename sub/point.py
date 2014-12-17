@@ -7,7 +7,7 @@ Created on Sun Sep 21 20:47:36 2014
 import numpy as np
 import matplotlib.pyplot as plt
 
-scan_w = 3
+scan_w = 2
 scan_l = 7
 
 def pIO(mov, ax, fig):

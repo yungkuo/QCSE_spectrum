@@ -8,19 +8,15 @@ Created on Tue Nov 11 21:30:02 2014
 import numpy as np
 import matplotlib.pyplot as plt
 import libtiff
-import matplotlib.animation as animation 
+#import matplotlib.animation as animation 
 from sub import point, lambda_cali
-from scipy.ndimage.filters import gaussian_filter1d
+#from scipy.ndimage.filters import gaussian_filter1d
 from scipy.optimize import curve_fit
 plt.close("all")
 
-<<<<<<< HEAD
 filePath='E:/QCSE data/'
-fileName='617E-120V-2'
-=======
-filePath='/Users/yung/121414QCSE/'
 fileName='617E-120V-4'
->>>>>>> origin/master
+
 
 mov = libtiff.TiffFile(filePath+fileName+'.tif')
 movie = mov.get_tiff_array()
@@ -38,7 +34,7 @@ T = np.arange(0,t,dt)
 T_3d = np.tile(T[:,np.newaxis,np.newaxis],(1,row,col))
 movie[0:frame_start,:,:]=movie[frame_start,:,:]
 scan_w=3     # extract 3*2+1=7 pixels in width(perpendicular to spectral diffusion line) around QD
-scan_l=35    # extract 45*2+1=91 pixels in length = spectral width
+scan_l=25    # extract 45*2+1=91 pixels in length = spectral width
 x = np.arange(0,col,1)
 polydeg = 7
 polydeg_bg = 9
@@ -50,11 +46,14 @@ polydeg_pb = 8
 """
 Calibration of wavelength
 """
-cali1 = plt.imread(filePath+'calibration2.tif')
-cali2 = plt.imread(filePath+'calibration.tif')
-refimg = cali1+cali2*1
-x_lambda = lambda_cali.lambda_cali(refimg)
-#plt.savefig(filePath+fileName+'e.fig1.pdf', format='pdf')
+
+cali1 = np.float64(plt.imread(filePath+'550.40.tif'))
+cali2 = np.float64(plt.imread(filePath+'600lp.tif'))
+cali3 = np.float64(plt.imread(filePath+'700lp.tif'))
+bulb  = np.float64(plt.imread(filePath+'light bulb.tif'))
+
+x_lambda = lambda_cali.lambda_cali(bulb,cali1,cali2,cali3)
+plt.savefig(filePath+fileName+'d.fig1.pdf', format='pdf')
 
 
 
@@ -83,7 +82,7 @@ ax.plot(x,np.tile(np.array(row_pt-scan_w+1), col),c='w')
 ax.set_xlim([0,col])
 ax.set_ylim([row,0])
 fig.canvas.draw()
-#plt.savefig(filePath+fileName+'e.fig2.pdf', format='pdf')
+plt.savefig(filePath+fileName+'d.fig2.pdf', format='pdf')
 bg = np.sum(np.sum(movie[:,row_pt-scan_w:row_pt+scan_w+1,:],axis=0),axis=0)/((scan_w*2+1)*frame)
 
 
@@ -105,13 +104,14 @@ movie_bgcr = movie[:,:,:]-bg_3d
 movie_bgcr1 = np.sum(np.sum(movie_bgcr,axis=0),axis=0)/(row*frame)
 movie_t = np.sum(np.sum(movie_bgcr,axis=1),axis=1)/(row*col)
 #movie_pb = movingaverage(movie_t,window_size)
-pb_constant = np.polyfit(T[frame_start:len(T)-window_size:1],movie_t[frame_start:len(T)-window_size:1],polydeg_pb)
+pb_constant = np.polyfit(T[frame_start:len(T):1],movie_t[frame_start:len(T):1],polydeg_pb)
 pbleach = np.polyval(pb_constant,T)
+movie_pbcr = movie_t-pbleach
 #pbc = pb_constant[1]/pbleach
 
-gaufil = gaussian_filter1d(movie_bgcr, sigma=80, axis=0)
-movie_fil = movie_bgcr-gaufil
-movie_fil_t = np.sum(np.sum(movie_fil,axis=1),axis=1)/(row*col)
+#gaufil = gaussian_filter1d(movie_bgcr, sigma=80, axis=0)
+#movie_fil = movie_bgcr-gaufil
+#movie_fil_t = np.sum(np.sum(movie_fil,axis=1),axis=1)/(row*col)
 
 fig,(ax,ax2,ax3)=plt.subplots(3,1,sharex=False)
 
@@ -119,6 +119,7 @@ line_sbg=ax.plot(x, p,'m',label='polyfit({}) bg'.format(polydeg_bg))
 line_bg=ax.plot(x, bg,'c',label='bg')
 ax.set_title('Background')
 ax.set_xlabel('pixels')
+ax.set_xlim([0,col])
 handles, labels = ax.get_legend_handles_labels()
 ax.legend(handles, labels, bbox_to_anchor=(0.93, 1), loc=2, borderaxespad=0, fontsize=12)
 
@@ -126,21 +127,22 @@ line_movie=ax2.plot(x,(np.sum(np.sum(movie,axis=0),axis=0)/(row*frame)),'g',labe
 line_movie_bgcr=ax2.plot(x,movie_bgcr1,'y',label='after bgcr')
 ax2.set_title('Background correction')
 ax2.set_xlabel('pixels')
+ax2.set_xlim([0,col])
 handles, labels = ax2.get_legend_handles_labels()
 ax2.legend(handles, labels, bbox_to_anchor=(0.93, 1), loc=2, borderaxespad=0, fontsize=12)
 ax2.annotate('Background correction={}'.format(backGND_corr),xy=(0,0), xytext=(0.7,0.1), xycoords='axes fraction', fontsize=10)
 
-ax3.plot(T[frame_start:len(T)-window_size:1],movie_t[frame_start:len(T)-window_size:1], label='original I')
-ax3.plot(T[frame_start:len(T)-window_size:1],pbleach[frame_start:len(T)-window_size:1], label='polyfit({})'.format(polydeg_pb))
-ax3.plot(T[frame_start:len(T)-window_size:1],np.multiply(movie_t, 1/pbleach)[frame_start:len(T)-window_size:1], label='I- polyfit=1')
-ax3.plot(T[frame_start:len(T)-window_size:1],movie_fil_t[frame_start:len(T)-window_size:1], label='high pass filter=2')
+ax3.plot(T[frame_start:len(T):1],movie_t[frame_start:len(T):1], label='original I')
+ax3.plot(T[frame_start:len(T):1],pbleach[frame_start:len(T):1], label='polyfit({})'.format(polydeg_pb))
+ax3.plot(T[frame_start:len(T):1],movie_pbcr[frame_start:len(T):1], label='I- polyfit=1')
+#ax3.plot(T[frame_start:len(T)-window_size:1],movie_fil_t[frame_start:len(T)-window_size:1], label='high pass filter=2')
 ax3.set_title('Time trace correction')
 handles, labels = ax3.get_legend_handles_labels()
 ax3.legend(handles, labels,bbox_to_anchor=(0.93, 1), loc=2, borderaxespad=0, fontsize=12)
 ax3.set_xlabel('time (s)')
 ax3.annotate('Time correction={}'.format(Time_corr),xy=(0,0), xytext=(0.7,0.1), xycoords='axes fraction', fontsize=10)
 plt.show()
-#plt.savefig(filePath+fileName+'e.fig3.pdf', format='pdf', bbox_inches = 'tight')    
+plt.savefig(filePath+fileName+'d.fig3.pdf', format='pdf', bbox_inches = 'tight')    
     
     
 if backGND_corr == 1:
@@ -148,8 +150,8 @@ if backGND_corr == 1:
         mov_f = np.zeros((frame,row,col))
         for i in range(frame):
             mov_f[i,:,:] = movie_bgcr[i,:,:]-pbleach[i] 
-    elif Time_corr ==2:
-        mov_f = movie_fil
+    #elif Time_corr ==2:
+        #mov_f = movie_fil
     else: 
         mov_f=movie_bgcr
 else:
@@ -185,7 +187,7 @@ pts = np.array(pts)
 pts_new = point.localmax(abs_I_diff, pts, ax, fig)
 npoint = np.size(pts_new[:,0])
 ax.plot((pts_new[:,1]+scan_l, pts_new[:,1]-scan_l, pts_new[:,1]-scan_l,pts_new[:,1]+scan_l,pts_new[:,1]+scan_l), (pts_new[:,0]-scan_w, pts_new[:,0]-scan_w, pts_new[:,0]+scan_w, pts_new[:,0]+scan_w,pts_new[:,0]-scan_w), '-+', color='b')
-#plt.savefig(filePath+fileName+'e.fig4.pdf', format='pdf')
+plt.savefig(filePath+fileName+'d.fig4.pdf', format='pdf')
 
 """
 Extracting spectra from 7 X 91 pixels around points of interest 
@@ -204,9 +206,10 @@ box_bgcr = np.zeros((frame,npoint))
 box_origin = np.zeros((frame,npoint))
 spectra = np.zeros((frame,2*scan_l+1,npoint))
 boxmovie = np.zeros((frame,2*scan_w+1,2*scan_l+1,npoint))
+boxtile = np.zeros((frame*(2*scan_w+1),2*scan_l+1, npoint))
 fig, axarr = plt.subplots(npoint*2,1, sharex=True, sharey=False)
 fig2, axarr2 = plt.subplots(npoint,2)
-fig3, axarr3 = plt.subplots(npoint)
+
 
 for n in range(npoint):   
     for i in range(frame):
@@ -215,8 +218,8 @@ for n in range(npoint):
         
         box_intensity[i,n] = np.sum(np.sum(boxmovie[i,:,:,n], axis=0),axis=0)/((scan_w*2+1)*(scan_l*2+1)) 
     
-        tempg = point.mask(gaufil[i,:,:], pts_new[n,:], scan_w, scan_l)
-        box_gaufil[i,n] = tempg.sum()/((scan_w*2+1)*(scan_l*2+1))
+        #tempg = point.mask(gaufil[i,:,:], pts_new[n,:], scan_w, scan_l)
+        #box_gaufil[i,n] = tempg.sum()/((scan_w*2+1)*(scan_l*2+1))
         
         tempbgcr = point.mask(movie_bgcr[i,:,:], pts_new[n,:], scan_w, scan_l)
         box_bgcr[i,n] = tempbgcr.sum()/((scan_w*2+1)*(scan_l*2+1))        
@@ -225,19 +228,12 @@ for n in range(npoint):
         box_origin[i,n] = tempo.sum()/((scan_w*2+1)*(scan_l*2+1))  
     
     
-    
-    ims = []
-    for i in range(frame):
-        im=axarr3[n].imshow(boxmovie[i,:,:,n],vmin=boxmovie[:,:,:,n].min(),vmax=boxmovie[:,:,:,n].max(),cmap='hot')
-        ims.append([im]) 
-    ani = animation.ArtistAnimation(fig3, ims, interval=dt, blit=True,repeat_delay=1000)
-    
-
+    boxtile[:,:,n] = np.reshape(boxmovie[:,:,:,n], (frame*(2*scan_w+1),2*scan_l+1))
     std = np.std(box_intensity[frame_start:,n],axis=0,ddof=1,dtype='d')
     thre_constant = box_intensity[frame_start:,n].mean()-std/2
     threshold = np.tile(thre_constant,frame)     
     
-    axarr[n*2].imshow(np.transpose(spectra[:,:,n]), cmap='gray')
+    axarr[n*2].imshow((spectra[:,:,n].T), cmap='gray')
     axarr[n*2+1].plot(np.arange(0,frame,1,dtype='int'),box_intensity[:,n], 'b')
     axarr[n*2+1].plot(np.arange(0,frame,1,dtype='int'),threshold, 'r')
     #axarr[n*2+1].plot(np.arange(0,frame,1,dtype='int'),box_gaufil[:,n], 'g')
@@ -368,14 +364,22 @@ for n in range(npoint):
     axarr2[n,1].set_xlim([x_lambda[pts_new[n,1]-scan_l],x_lambda[pts_new[n,1]+scan_l+1]])    
     handles, labels = axarr2[n,1].get_legend_handles_labels()    
     axarr2[n,1].legend(handles, labels,bbox_to_anchor=(0.7, 1), loc=2, borderaxespad=0, fontsize=10)
-#fig.savefig(filePath+fileName+'e.fig5.pdf', format='pdf')
-#fig2.savefig(filePath+fileName+'e.fig6.pdf', format='pdf', bbox_inches = 'tight')
+fig.savefig(filePath+fileName+'d.fig5.pdf', format='pdf')
+fig2.savefig(filePath+fileName+'d.fig6.pdf', format='pdf', bbox_inches = 'tight')
 
-ims = []
-for i in range(frame):
-    im=axarr3[n].imshow(boxmovie[i,:,:,1],vmin=boxmovie[:,:,:,n].min(),vmax=boxmovie[:,:,:,n].max(),cmap='hot')
-    ims.append([im]) 
-ani = animation.ArtistAnimation(fig3, ims, interval=dt, blit=True,repeat_delay=1000)
-writer = animation.writers['ffmpeg'](fps=1/dt)
-ani.save(filePath+'movie1.mp4',writer=writer,dpi=100)
+splitrow = 5
+for i in range(npoint):
+    fig, ax = plt.subplots(splitrow,1)
+    for k in range(splitrow):    
+        ax[k].imshow((boxtile[len(boxtile[:,0,i])/splitrow*k:len(boxtile[:,0,i])/splitrow*(k+1),:,i].T), cmap='gray')
+    fig.savefig(filePath+fileName+'d.fig{}'.format(7+i)+'.pdf', format='pdf', bbox_inches = 'tight')
 
+#fig3, axarr3 = plt.subplots(npoint)
+#for j in range(npoint):    
+#    ims = []
+#    for i in range(frame):
+#        im=axarr3[j].imshow(boxmovie[i,:,:,j],vmin=boxmovie[:,:,:,j].min(),vmax=boxmovie[:,:,:,j].max(),cmap='hot')
+#        ims.append([im]) 
+#    ani = animation.ArtistAnimation(fig3, ims, interval=dt*1000, blit=True,repeat_delay=1000)
+#    writer = animation.writers['ffmpeg'](fps=1/dt)
+#ani.save(filePath+'movie.mp4',writer=writer,dpi=100)
