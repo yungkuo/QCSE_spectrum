@@ -42,9 +42,9 @@ def lambda_cali(bulb, cali1,cali2,cali3):
 
     slope_max = np.zeros(4)
     slope_max[0] = int(*np.where(imdiffsmth[0,:] == imdiffsmth[0,0:300].max()))
-    slope_max[1] = int(*np.where(imdiffsmth[0,:] == imdiffsmth[0,:].min()))
-    slope_max[2] = int(*np.where(imdiffsmth[1,:] == imdiffsmth[1,:].max()))
-    slope_max[3] = int(*np.where(imdiffsmth[2,:] == imdiffsmth[2,:].max()))
+    slope_max[1] = int(*np.where(imdiffsmth[0,:] == imdiffsmth[0,0:300].min()))
+    slope_max[2] = int(*np.where(imdiffsmth[1,:] == imdiffsmth[1,200:300].max()))
+    slope_max[3] = int(*np.where(imdiffsmth[2,:] == imdiffsmth[2,300:400].max()))
 
     lambda_fit = np.polyfit(slope_max, np.array([530,570,600,700]), 3)
     p = np.polyval(lambda_fit, x)

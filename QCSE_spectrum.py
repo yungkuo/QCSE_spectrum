@@ -8,15 +8,15 @@ Created on Tue Nov 11 21:30:02 2014
 import numpy as np
 import matplotlib.pyplot as plt
 import libtiff
-#import matplotlib.animation as animation 
+import matplotlib.animation as animation 
 from sub import point, lambda_cali
 #from scipy.ndimage.filters import gaussian_filter1d
 from scipy.optimize import curve_fit
 plt.close("all")
 
-filePath='E:/QCSE data/'
-fileName='617E-120V-4'
-
+filePath='E:/QCSE data/121814QCSE/'
+fileName='100619A-120V-15'
+abc = 'b'
 
 mov = libtiff.TiffFile(filePath+fileName+'.tif')
 movie = mov.get_tiff_array()
@@ -34,13 +34,13 @@ T = np.arange(0,t,dt)
 T_3d = np.tile(T[:,np.newaxis,np.newaxis],(1,row,col))
 movie[0:frame_start,:,:]=movie[frame_start,:,:]
 scan_w=3     # extract 3*2+1=7 pixels in width(perpendicular to spectral diffusion line) around QD
-scan_l=25    # extract 45*2+1=91 pixels in length = spectral width
+scan_l=35    # extract 45*2+1=91 pixels in length = spectral width
 x = np.arange(0,col,1)
 polydeg = 7
-polydeg_bg = 9
+polydeg_bg = 33
 polydeg_pb = 8
-
-
+savefig = 1 # 1 = Yes, save figures, else = No, don't save
+playmovie = 0 # 1 = Yes, play movie, else = No, don't play
 
 
 """
@@ -53,7 +53,8 @@ cali3 = np.float64(plt.imread(filePath+'700lp.tif'))
 bulb  = np.float64(plt.imread(filePath+'light bulb.tif'))
 
 x_lambda = lambda_cali.lambda_cali(bulb,cali1,cali2,cali3)
-plt.savefig(filePath+fileName+'d.fig1.pdf', format='pdf')
+if savefig == 1:
+    plt.savefig(filePath+fileName+abc+'.fig1.pdf', format='pdf')
 
 
 
@@ -82,7 +83,8 @@ ax.plot(x,np.tile(np.array(row_pt-scan_w+1), col),c='w')
 ax.set_xlim([0,col])
 ax.set_ylim([row,0])
 fig.canvas.draw()
-plt.savefig(filePath+fileName+'d.fig2.pdf', format='pdf')
+if savefig == 1:
+    plt.savefig(filePath+fileName+abc+'.fig2.pdf', format='pdf')
 bg = np.sum(np.sum(movie[:,row_pt-scan_w:row_pt+scan_w+1,:],axis=0),axis=0)/((scan_w*2+1)*frame)
 
 
@@ -100,7 +102,7 @@ window_size=10
 #p=movingaverage(bg,window_size)
 
 bg_3d = np.tile(p[np.newaxis,np.newaxis,:],(frame,row,1))
-movie_bgcr = movie[:,:,:]-bg_3d
+movie_bgcr = movie[:frame,:,:]-bg_3d
 movie_bgcr1 = np.sum(np.sum(movie_bgcr,axis=0),axis=0)/(row*frame)
 movie_t = np.sum(np.sum(movie_bgcr,axis=1),axis=1)/(row*col)
 #movie_pb = movingaverage(movie_t,window_size)
@@ -142,7 +144,8 @@ ax3.legend(handles, labels,bbox_to_anchor=(0.93, 1), loc=2, borderaxespad=0, fon
 ax3.set_xlabel('time (s)')
 ax3.annotate('Time correction={}'.format(Time_corr),xy=(0,0), xytext=(0.7,0.1), xycoords='axes fraction', fontsize=10)
 plt.show()
-plt.savefig(filePath+fileName+'d.fig3.pdf', format='pdf', bbox_inches = 'tight')    
+if savefig ==1:
+    plt.savefig(filePath+fileName+abc+'.fig3.pdf', format='pdf', bbox_inches = 'tight')    
     
     
 if backGND_corr == 1:
@@ -158,15 +161,14 @@ else:
     mov_f=movie
 
 
-
-#fig=plt.figure()
-#ims = []
-#for i in range(frame):
-#    im=plt.imshow(mov_f[i,:,:],vmin=mov_f.min(),vmax=mov_f.max(),cmap='hot')
-#     ims.append([im]) 
-#ani = animation.ArtistAnimation(fig, ims, interval=dt, blit=True,
-#    repeat_delay=1000)
-#plt.title('movie')  
+if playmovie == 1:
+    fig=plt.figure()
+    ims = []
+    for i in range(frame):
+        im=plt.imshow(mov_f[i,:,:],vmin=mov_f.min(),vmax=mov_f.max(),cmap='hot')
+        ims.append([im]) 
+    ani = animation.ArtistAnimation(fig, ims, interval=dt, blit=True, repeat_delay=1000)
+    plt.title('movie')  
 
 newim=np.zeros((row,col))
 for i in range(frame-1):       
@@ -180,14 +182,15 @@ Define points (QDs) of interest, and their peak position
 """
 
 fig, ax = plt.subplots()
-im = ax.imshow(newim,cmap='gray')
+im = ax.imshow(newim,cmap='gray', vmin=newim.min(), vmax=newim.max())
 
 pts = point.pIO(mov_f, ax, fig)
 pts = np.array(pts)
 pts_new = point.localmax(abs_I_diff, pts, ax, fig)
 npoint = np.size(pts_new[:,0])
 ax.plot((pts_new[:,1]+scan_l, pts_new[:,1]-scan_l, pts_new[:,1]-scan_l,pts_new[:,1]+scan_l,pts_new[:,1]+scan_l), (pts_new[:,0]-scan_w, pts_new[:,0]-scan_w, pts_new[:,0]+scan_w, pts_new[:,0]+scan_w,pts_new[:,0]-scan_w), '-+', color='b')
-plt.savefig(filePath+fileName+'d.fig4.pdf', format='pdf')
+if savefig ==1:
+    plt.savefig(filePath+fileName+abc+'.fig4.pdf', format='pdf')
 
 """
 Extracting spectra from 7 X 91 pixels around points of interest 
@@ -364,15 +367,17 @@ for n in range(npoint):
     axarr2[n,1].set_xlim([x_lambda[pts_new[n,1]-scan_l],x_lambda[pts_new[n,1]+scan_l+1]])    
     handles, labels = axarr2[n,1].get_legend_handles_labels()    
     axarr2[n,1].legend(handles, labels,bbox_to_anchor=(0.7, 1), loc=2, borderaxespad=0, fontsize=10)
-fig.savefig(filePath+fileName+'d.fig5.pdf', format='pdf')
-fig2.savefig(filePath+fileName+'d.fig6.pdf', format='pdf', bbox_inches = 'tight')
+if savefig == 1:
+    fig.savefig(filePath+fileName+abc+'.fig5.pdf', format='pdf')
+    fig2.savefig(filePath+fileName+abc+'.fig6.pdf', format='pdf', bbox_inches = 'tight')
 
 splitrow = 5
 for i in range(npoint):
     fig, ax = plt.subplots(splitrow,1)
     for k in range(splitrow):    
         ax[k].imshow((boxtile[len(boxtile[:,0,i])/splitrow*k:len(boxtile[:,0,i])/splitrow*(k+1),:,i].T), cmap='gray')
-    fig.savefig(filePath+fileName+'d.fig{}'.format(7+i)+'.pdf', format='pdf', bbox_inches = 'tight')
+    if savefig ==1:
+        fig.savefig(filePath+fileName+abc+'.fig{}'.format(7+i)+'.pdf', format='pdf', bbox_inches = 'tight')
 
 #fig3, axarr3 = plt.subplots(npoint)
 #for j in range(npoint):    
