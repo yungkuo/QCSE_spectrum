@@ -14,34 +14,34 @@ from sub import point, lambda_cali
 from scipy.optimize import curve_fit
 plt.close("all")
 
-filePath='E:/QCSE data/121814QCSE/'
-fileName='100619A-120V-15'
-abc = 'b'
+filePath='E:/NPLs spectrum/150522/'
+fileName='NPLs_spec_10'
+abc = 'a'
 
 mov = libtiff.TiffFile(filePath+fileName+'.tif')
 movie = mov.get_tiff_array()
 movie=np.array(movie[:,:,:],dtype='d')
 
 backGND_corr = 1          # 1 = apply correction, else = no correction
-Time_corr = 1   # 1 = apply polynomial fit, 2 = apply Gaussian filter, else = no correction
+Time_corr = 0   # 1 = apply polynomial fit, 2 = apply Gaussian filter, else = no correction
 frame=len(movie[:,0,0])
 row=len(movie[0,:,0])
 col=len(movie[0,0,:])
 dt=0.125
-frame_start=2
+frame_start=0
 t=frame*dt
 T = np.arange(0,t,dt)
 T_3d = np.tile(T[:,np.newaxis,np.newaxis],(1,row,col))
 movie[0:frame_start,:,:]=movie[frame_start,:,:]
 scan_w=3     # extract 3*2+1=7 pixels in width(perpendicular to spectral diffusion line) around QD
-scan_l=35    # extract 45*2+1=91 pixels in length = spectral width
+scan_l=30   # extract 35*2+1=71 pixels in length = spectral width
 x = np.arange(0,col,1)
 polydeg = 7
 polydeg_bg = 33
 polydeg_pb = 8
 savefig = 1 # 1 = Yes, save figures, else = No, don't save
 playmovie = 0 # 1 = Yes, play movie, else = No, don't play
-
+mean_fig = 1 # 1 = display mean movie image, else = display differencial image
 
 """
 Calibration of wavelength
@@ -62,30 +62,30 @@ if savefig == 1:
 Background and Gaussian filter correction
 """
 
-abs_I_diff=np.zeros((row, col))
+abs_I_diff = np.zeros((row, col))
 for i in range(frame-1):       
     c=movie[i,:,:]
     d=movie[i+1,:,:]
     abs_I_diff=abs_I_diff+np.absolute(d-c)  
+mean_I = np.mean(movie, axis=0)
 
 
-fig, ax = plt.subplots()
-ax.imshow(abs_I_diff, vmin=abs_I_diff.min(), vmax=abs_I_diff.max(),cmap='gray')
-plt.title('Differential image')
 
 
 print 'Choose background near point of interest'
 bg_pt = np.array(plt.ginput(1))
 row_pt = int(bg_pt[0,1])
 col_pt = int(bg_pt[0,0])
-ax.plot(x,np.tile(np.array(row_pt+scan_w), col),c='w')
-ax.plot(x,np.tile(np.array(row_pt-scan_w+1), col),c='w')
+ax.plot(x,np.tile(np.array(row_pt+scan_w*2), col),c='w')
+ax.plot(x,np.tile(np.array(row_pt-scan_w*2), col),c='w')
 ax.set_xlim([0,col])
 ax.set_ylim([row,0])
 fig.canvas.draw()
 if savefig == 1:
     plt.savefig(filePath+fileName+abc+'.fig2.pdf', format='pdf')
-bg = np.sum(np.sum(movie[:,row_pt-scan_w:row_pt+scan_w+1,:],axis=0),axis=0)/((scan_w*2+1)*frame)
+bg = np.mean(np.mean(movie[:,row_pt-scan_w*2:row_pt+scan_w*2,:],axis=0),axis=0)
+
+#    bg = np.sum(np.sum(movie[:,row_pt-scan_w*10:row_pt+scan_w*10,:],axis=0),axis=0)/((scan_w*2*10)*frame)
 
 
 bg_fit=np.polyfit(x, bg, polydeg_bg) #fitting to background
@@ -176,17 +176,26 @@ for i in range(frame-1):
     d=mov_f[i+1,:,:]
     newim=newim+np.absolute(d-c)
 #newim=np.sum(movie_bgcr,axis=0)
+new_mean_I = np.mean(mov_f, axis=0)
+
 
 """
 Define points (QDs) of interest, and their peak position
 """
 
 fig, ax = plt.subplots()
-im = ax.imshow(newim,cmap='gray', vmin=newim.min(), vmax=newim.max())
+if mean_fig == 1:
+    ax.imshow(new_mean_I, cmap='gray', vmin=new_mean_I.min(), vmax=new_mean_I.max()/2)
+else:
+    ax.imshow(newim,cmap='gray', vmin=newim.min(), vmax=newim.max()/2)
+plt.title('Select particles')
 
 pts = point.pIO(mov_f, ax, fig)
 pts = np.array(pts)
-pts_new = point.localmax(abs_I_diff, pts, ax, fig)
+if mean_fig == 1:
+    pts_new = point.localmax(new_mean_I, pts, ax, fig)
+else:
+    pts_new = point.localmax(abs_I_diff, pts, ax, fig)
 npoint = np.size(pts_new[:,0])
 ax.plot((pts_new[:,1]+scan_l, pts_new[:,1]-scan_l, pts_new[:,1]-scan_l,pts_new[:,1]+scan_l,pts_new[:,1]+scan_l), (pts_new[:,0]-scan_w, pts_new[:,0]-scan_w, pts_new[:,0]+scan_w, pts_new[:,0]+scan_w,pts_new[:,0]-scan_w), '-+', color='b')
 if savefig ==1:
@@ -216,6 +225,7 @@ fig2, axarr2 = plt.subplots(npoint,2)
 
 for n in range(npoint):   
     for i in range(frame):
+    
         boxmovie[i,:,:,n]  = point.mask(mov_f[i,:,:], pts_new[n,:], scan_w, scan_l)
         spectra[i,:,n] = np.mean(boxmovie[i,:,:,n] , axis=0)        
         
@@ -235,14 +245,14 @@ for n in range(npoint):
     std = np.std(box_intensity[frame_start:,n],axis=0,ddof=1,dtype='d')
     thre_constant = box_intensity[frame_start:,n].mean()-std/2
     threshold = np.tile(thre_constant,frame)     
-    
-    axarr[n*2].imshow((spectra[:,:,n].T), cmap='gray')
     axarr[n*2+1].plot(np.arange(0,frame,1,dtype='int'),box_intensity[:,n], 'b')
     axarr[n*2+1].plot(np.arange(0,frame,1,dtype='int'),threshold, 'r')
+    axarr[n*2].imshow((spectra[:,:,n].T), cmap='gray')
+    
     #axarr[n*2+1].plot(np.arange(0,frame,1,dtype='int'),box_gaufil[:,n], 'g')
     #axarr[n*2+1].plot(np.arange(0,frame,1,dtype='int'),box_bgcr[:,n], 'c')
     #axarr[n*2+1].plot(np.arange(0,frame,1,dtype='int'),box_origin[:,n], 'y')
-    axarr[n*2+1].set_xlim([0,300])
+    axarr[n*2+1].set_xlim([0,frame])
     axarr[n*2+1].set_xlabel('frame')    
         
     
@@ -371,7 +381,7 @@ if savefig == 1:
     fig.savefig(filePath+fileName+abc+'.fig5.pdf', format='pdf')
     fig2.savefig(filePath+fileName+abc+'.fig6.pdf', format='pdf', bbox_inches = 'tight')
 
-splitrow = 5
+splitrow = 2
 for i in range(npoint):
     fig, ax = plt.subplots(splitrow,1)
     for k in range(splitrow):    
