@@ -14,27 +14,28 @@ from sub import point, lambda_cali
 from scipy.optimize import curve_fit
 plt.close("all")
 
-filePath='E:/NPLs spectrum/150522/'
-fileName='NPLs_spec_10'
+#filePath='E:/NPLs spectrum/150522/'
+filePath = '/Users/yung/Documents/Data/QCSE/111414QCSE/'
+fileName='100617G-90V-1'
 abc = 'a'
 
 mov = libtiff.TiffFile(filePath+fileName+'.tif')
 movie = mov.get_tiff_array()
-movie=np.array(movie[:,:,:],dtype='d')
+movie = np.array(movie[:,:,:],dtype='d')
 
 backGND_corr = 1          # 1 = apply correction, else = no correction
 Time_corr = 0   # 1 = apply polynomial fit, 2 = apply Gaussian filter, else = no correction
-frame=len(movie[:,0,0])
-row=len(movie[0,:,0])
-col=len(movie[0,0,:])
-dt=0.125
-frame_start=0
-t=frame*dt
+frame = len(movie[:,0,0])
+row = len(movie[0,:,0])
+col = len(movie[0,0,:])
+dt = 0.125
+frame_start = 0
+t = frame*dt
 T = np.arange(0,t,dt)
 T_3d = np.tile(T[:,np.newaxis,np.newaxis],(1,row,col))
-movie[0:frame_start,:,:]=movie[frame_start,:,:]
-scan_w=3     # extract 3*2+1=7 pixels in width(perpendicular to spectral diffusion line) around QD
-scan_l=30   # extract 35*2+1=71 pixels in length = spectral width
+movie[0:frame_start,:,:] = movie[frame_start,:,:]
+scan_w = 3     # extract 3*2+1=7 pixels in width(perpendicular to spectral diffusion line) around QD
+scan_l = 30   # extract 35*2+1=71 pixels in length = spectral width
 x = np.arange(0,col,1)
 polydeg = 7
 polydeg_bg = 33
@@ -43,8 +44,9 @@ savefig = 1 # 1 = Yes, save figures, else = No, don't save
 playmovie = 0 # 1 = Yes, play movie, else = No, don't play
 mean_fig = 1 # 1 = display mean movie image, else = display differencial image
 
+
 """
-Calibration of wavelength
+Calibrating wavelength
 """
 
 cali1 = np.float64(plt.imread(filePath+'550.40.tif'))
