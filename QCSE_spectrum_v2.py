@@ -13,25 +13,24 @@ from sub import point1, lambda_cali_v1
 #from scipy.ndimage.filters import gaussian_filter1d
 #from scipy.optimize import curve_fit
 import lmfit
+#import xlsxwriter
 
 """
 Control Panel
 """
 #filePath='E:/NPLs spectrum/150522/'
-filePath = '/Users/yung/Documents/Data/QCSE/150615 CdSeCdS rod/'
-fileName='120V-003'
-abc = 'a'
-savefig = 0         # 1 = Yes, save figures, else = No, don't save
-backGND_corr = 1    # 1 = apply correction, else = no correction
-Time_corr = 0       # 1 = apply polynomial fit, 2 = apply Gaussian filter, else = no correction
+filePath = '/Users/yung/Documents/Data/QCSE/061115 CdSe(Te)@CdS/'
+fileName='4_120V'
+abc = 'a1'
+savefig = 1         # 1 = Yes, save figures, else = No, don't save
 frame_start = 2
-scan_w = 3          # extract scan_w*2 pixels in width(perpendicular to spectral diffusion line) around QD
-scan_l = 30         # extract scan_l*2 pixels in length = spectral width
-scan_bg = scan_w*5
+scan_w = 6          # extract scan_w*2 pixels in width(perpendicular to spectral diffusion line) around QD
+scan_l = 35         # extract scan_l*2 pixels in length = spectral width
+bg_scan = scan_w+3
 playmovie = 0       # 1 = Yes, play movie, else = No, don't play
-mean_fig = 1        # 1 = display mean movie image, else = display differencial image
-
-
+mean_fig = 1        # 1 = display mean movie image, 2 = display mean(log) image, else = display differencial image
+nstd = 1.8
+assignQDcoor = 1
 """
 Import movie; Define parameters
 """
@@ -43,132 +42,52 @@ frame = len(movie[:,0,0])
 row = len(movie[0,:,0])
 col = len(movie[0,0,:])
 dt = 0.125
-t = frame*dt
-T = np.arange(0,t,dt)
-T_3d = np.tile(T[:,np.newaxis,np.newaxis],(1,row,col))
 movie[0:frame_start,:,:] = movie[frame_start,:,:]
 x = np.arange(0,col,1)
-polydeg = 7
-polydeg_bg = 33
-polydeg_pb = 8
+coor = np.array([[259, 332],
+[312, 164],
 
 
+])
+
+#%%
 """
 Calibrating wavelength
 """
 c1 = filePath+'c1.tif'
 mov = libtiff.TiffFile(c1)
 c1 = mov.get_tiff_array()
-c1 = np.mean(c1[0,50:,:],dtype='d', axis=0)-np.mean(c1[0,0:50,:],dtype='d', axis=0)
+#fig, ax = plt.subplots()
+#ax.imshow(np.array(c1[0,:,:]))
+c1 = np.mean(c1[0,50:,:],dtype='d', axis=0)-np.mean(c1[0,0:20,:],dtype='d', axis=0)
 
 c2 = filePath+'c2.tif'
 mov = libtiff.TiffFile(c2)
 c2 = mov.get_tiff_array()
-c2 = np.mean(c2[0,50:,:],dtype='d', axis=0)-np.mean(c2[0,0:50,:],dtype='d', axis=0)
+#fig, ax = plt.subplots()
+#ax.imshow(np.array(c2[0,:,:]))
+c2 = np.mean(c2[0,50:,:],dtype='d', axis=0)-np.mean(c2[0,0:20,:],dtype='d', axis=0)
 
 c3 = filePath+'c3.tif'
 mov = libtiff.TiffFile(c3)
 c3 = mov.get_tiff_array()
-c3 = np.mean(c3[0,50:,:],dtype='d', axis=0)-np.mean(c3[0,0:50,:],dtype='d', axis=0)
+#fig, ax = plt.subplots()
+#ax.imshow(np.array(c3[0,:,:]))
+c3 = np.mean(c3[0,50:,:],dtype='d', axis=0)-np.mean(c3[0,0:20,:],dtype='d', axis=0)
 
 lamp = filePath+'lamp.tif'
 mov = libtiff.TiffFile(lamp)
 lamp = mov.get_tiff_array()
-lamp = np.mean(lamp[0,50:,:],dtype='d', axis=0)-np.mean(lamp[0,0:50,:],dtype='d', axis=0)
+#fig, ax = plt.subplots()
+#ax.imshow(np.array(lamp[0,:,:]))
+lamp = np.mean(lamp[0,20:,:],dtype='d', axis=0)-np.mean(lamp[0,0:20,:],dtype='d', axis=0)
 
 
-x_lambda = lambda_cali_v1.x(lamp, c1, c2, c3, x)
+x_lambda = lambda_cali_v1.x_lambda(lamp, c1, c2, c3, x)
 if savefig == 1:
-    plt.savefig(filePath+'calibration.pdf', format='pdf')
+    plt.savefig(filePath+'fig1_calibration.pdf', format='pdf')
 
-
-
-
-"""
-Click background positions
-"""
-fig, ax = plt.subplots()
-if mean_fig == 1:
-    mean_I = np.mean(movie, axis=0)
-    ax.imshow(mean_I, cmap='gray')
-    ax.set_title('Mean image')
-else:
-    diff_I = np.mean(np.diff(movie, axis=0), axis=0)
-    ax.imshow(diff_I, cmap='gray')
-    ax.set_title('Differential image')
-
-bg_pt = np.array(plt.ginput(1, timeout=0))
-ax.axhline(y = bg_pt[0,1]-scan_bg, xmin=0, xmax=col, c='w')
-ax.axhline(y = bg_pt[0,1]+scan_bg, xmin=0, xmax=col, c='w')
-fig.canvas.draw()
-if savefig == 1:
-    plt.savefig(filePath+fileName+abc+'.fig2.pdf', format='pdf')
-
-"""
-Background correction & time correction
-"""
-def movingaverage(interval, window_size):
-    window = np.ones(int(window_size))/float(window_size)
-    return np.convolve(interval, window, 'same')
-
-window_size=10
-
-bg = np.mean(np.mean(movie[:, bg_pt[0,1]-scan_bg:bg_pt[0,1]+scan_bg,:], axis=0), axis=0)
-bg_fit = np.polyfit(x, bg, polydeg_bg) 
-bg_val = np.polyval(bg_fit, x)
-#bg_val = movingaverage(bg, window_size)
-
-bg_3d = np.tile(bg_val[np.newaxis,np.newaxis,:],(frame,row,1))
-movie_bgcr = movie - bg_3d
-movie_bgcrmean = np.mean(np.mean(movie_bgcr[:,bg_pt[0,1]-scan_bg:bg_pt[0,1]+scan_bg,:],axis=0),axis=0)
-movie_t = np.mean(np.mean(movie_bgcr,axis=1),axis=1)
-#movie_pb = movingaverage(movie_t,window_size)
-pb_fit = np.polyfit(T[frame_start:len(T):1],movie_t[frame_start:len(T):1],polydeg_pb)
-pb_val = np.polyval(pb_fit,T)
-movie_pbcr = movie_t-pb_val
-#pbc = pb_fit[1]/pb_val
-
-#gaufil = gaussian_filter1d(movie_bgcr, sigma=80, axis=0)
-#movie_fil = movie_bgcr-gaufil
-#movie_fil_t = np.sum(np.sum(movie_fil,axis=1),axis=1)/(row*col)
-
-fig,(ax1,ax2) = plt.subplots(2,sharex=False)
-ax1.plot(x, bg, '.', label='background')
-ax1.plot(x, bg_val, label='polyfit({})'.format(polydeg_bg))
-ax1.plot(x,movie_bgcrmean, label='after bgcr')
-ax2.plot(T[frame_start:len(T):1],movie_t[frame_start:len(T):1], label='time trace, I')
-ax2.plot(T[frame_start:len(T):1],pb_val[frame_start:len(T):1], label='polyfit({})'.format(polydeg_pb))
-ax2.plot(T[frame_start:len(T):1],movie_pbcr[frame_start:len(T):1], label='I- polyfit')
-#ax3.plot(T[frame_start:len(T)-window_size:1],movie_fil_t[frame_start:len(T)-window_size:1], label='high pass filter=2')
-ax1.set_title('Background correction')
-ax2.set_title('Time trace correction')
-ax1.set_xlabel('pixels')
-ax2.set_xlabel('time (s)')
-ax1.set_ylabel('fluorescence intensity')
-ax2.set_ylabel('fluorescence intensity/pixel')
-ax1.set_xlim([0,col])
-ax1.legend(bbox_to_anchor=(1, 1), frameon=False, borderaxespad=0, fontsize=10)
-ax2.legend(bbox_to_anchor=(1, 1), frameon=False, borderaxespad=0, fontsize=10)
-ax1.annotate('Background correction={}'.format(backGND_corr),xy=(0,0), xytext=(0.7,1), xycoords='axes fraction', fontsize=10)
-ax2.annotate('Time correction={}'.format(Time_corr),xy=(0,0), xytext=(0.7,1), xycoords='axes fraction', fontsize=10)
-plt.subplots_adjust(hspace = 0.5)
-if savefig ==1:
-    plt.savefig(filePath+fileName+abc+'.fig3.pdf', format='pdf', bbox_inches = 'tight')    
-    
-    
-if backGND_corr == 1:
-    if Time_corr == 1:
-        mov_f = np.zeros((frame,row,col))
-        for i in range(frame):
-            mov_f[i,:,:] = movie_bgcr[i,:,:]-pb_val[i] 
-    #elif Time_corr ==2:
-        #mov_f = movie_fil
-    else: 
-        mov_f=movie_bgcr
-else:
-    mov_f=movie
-
-
+#%%
 """
 Play movie
 """
@@ -176,108 +95,148 @@ if playmovie == 1:
     fig=plt.figure()
     ims = []
     for i in range(frame):
-        im=plt.imshow(mov_f[i,:,:],vmin=mov_f.min(),vmax=mov_f.max(),cmap='hot')
+        im=plt.imshow(np.log(movie[i,:,:]),vmin=np.log(movie.min()),vmax=np.log(movie.max()),cmap='hot')
         ims.append([im]) 
     ani = animation.ArtistAnimation(fig, ims, interval=dt, blit=True, repeat_delay=1000)
     plt.title('movie')  
-
 
 
 """
 Define points (QDs) of interest, and their peak position
 """
 fig, ax = plt.subplots()
-if mean_fig == 1:
-    new_mean_I = np.mean(mov_f, axis=0)
-    ax.imshow(new_mean_I, cmap='gray', interpolation='None')
-    ax.set_title('Mean image')
-else:
-    new_diff_I = np.mean(np.diff(mov_f, axis=0), axis=0)
-    ax.imshow(new_diff_I, cmap='gray', interpolation='None')
-    ax.set_title('Differential image')
-
-pts = np.array(plt.ginput(n=0, timeout=0, show_clicks=True))
-if mean_fig == 1:
-    pts_new = point1.localmax(new_mean_I, pts, ax, fig)
-    pts_new = point1.localmax(new_mean_I, pts_new, ax, fig)
-    pts_new = point1.localmax(new_mean_I, pts_new, ax, fig)
-else:
-    pts_new = point1.localmax(diff_I, pts, ax, fig)
-    pts_new = point1.localmax(diff_I, pts_new, ax, fig)    
-    pts_new = point1.localmax(diff_I, pts_new, ax, fig)
-ax.plot(pts[:,0], pts[:,1], 'r+')
+if assignQDcoor == 1:
+    pts = coor
+    pts_new = coor
+    mean_I = np.mean(movie, axis=0)
+    ax.imshow(mean_I, cmap='gray', interpolation='None')
+    ax.set_title('Mean image (assign coordinates)')
+else: 
+    if mean_fig == 1:
+        mean_I = np.mean(movie, axis=0)
+        ax.imshow(mean_I, cmap='gray', interpolation='None')
+        ax.set_title('Mean image')
+    elif mean_fig == 2:
+        logmean_I = np.mean(np.log(movie), axis=0)
+        ax.imshow(logmean_I, cmap='gray', interpolation='None')
+        ax.set_title('Mean(log) image')
+    else:
+        diff_I = np.mean(np.diff(movie, axis=0), axis=0)
+        ax.imshow(diff_I, cmap='gray', interpolation='None')
+        ax.set_title('Differential image')
+    
+    pts = np.array(plt.ginput(n=0, timeout=0, show_clicks=True))
+    if mean_fig == 1:
+        pts_new = point1.localmax(mean_I, pts, ax, fig)
+        pts_new = point1.localmax(mean_I, pts_new, ax, fig)
+        pts_new = point1.localmax(mean_I, pts_new, ax, fig)
+    elif mean_fig == 2:
+        pts_new = point1.localmax(logmean_I, pts, ax, fig)
+        pts_new = point1.localmax(logmean_I, pts_new, ax, fig)
+        pts_new = point1.localmax(logmean_I, pts_new, ax, fig)
+    else:
+        pts_new = point1.localmax(diff_I, pts, ax, fig)
+        pts_new = point1.localmax(diff_I, pts_new, ax, fig)    
+        pts_new = point1.localmax(diff_I, pts_new, ax, fig)
+    ax.plot(pts[:,0], pts[:,1], 'r+')
 ax.set_xlim(0, col)
 ax.set_ylim(row, 0)
 ax.plot((pts_new[:,0]-scan_l, pts_new[:,0]-scan_l, pts_new[:,0]+scan_l, pts_new[:,0]+scan_l,pts_new[:,0]-scan_l), 
         (pts_new[:,1]+scan_w, pts_new[:,1]-scan_w, pts_new[:,1]-scan_w, pts_new[:,1]+scan_w,pts_new[:,1]+scan_w), '-+', color='b')
+ax.plot((pts_new[:,0]-scan_l, pts_new[:,0]-scan_l, pts_new[:,0]+scan_l, pts_new[:,0]+scan_l,pts_new[:,0]-scan_l), 
+        (pts_new[:,1]+bg_scan, pts_new[:,1]-bg_scan, pts_new[:,1]-bg_scan, pts_new[:,1]+bg_scan,pts_new[:,1]+bg_scan), '-+', color='c', alpha=0.5)
+
 fig.canvas.draw()
 if savefig ==1:
-    plt.savefig(filePath+fileName+abc+'.fig4.pdf', format='pdf')
+    plt.savefig(filePath+fileName+abc+'.fig2_QD.pdf', format='pdf')
 
 #%%
 """
-Extract spectra from (scan_w*scan_l) box around points of interest (QD)
+Extract spectra and background around points of interest (QD); Background correction
 """
 boxmovie = np.zeros((frame, 2*scan_w, 2*scan_l, len(pts)))
+bgmovie = np.zeros((frame, 2*(bg_scan-scan_w), 2*scan_l, len(pts)))
 spectra = np.zeros((frame, 2*scan_l, len(pts)))
+bgspectra = np.zeros((frame, 2*scan_l, len(pts)))
 box_intensity = np.zeros((frame, len(pts)))
+bg_intensity = np.zeros((frame, len(pts)))
 boxtile = np.zeros((frame*(2*scan_w),2*scan_l, len(pts)))
-fig, ax = plt.subplots(len(pts)*2,1, sharex=True, sharey=False)
+bgtile = np.zeros((frame*(2*(bg_scan-scan_w)),2*scan_l, len(pts)))
 for n in range(len(pts)): 
-    boxmovie[:,:,:,n]  = point1.mask3d(mov_f, pts_new[n,:], scan_w, scan_l)
+    boxmovie[:,:,:,n] = point1.mask3d(movie, pts_new[n,:], scan_w, scan_l)
     spectra[:,:,n] = np.mean(boxmovie[:,:,:,n] , axis=1)        
-    box_intensity[:,n] = np.mean(np.mean(boxmovie[:,:,:,n], axis=1), axis=1) 
+    box_intensity[:,n] = np.mean(spectra[:,:,n], axis=1) 
     boxtile[:,:,n] = np.reshape(boxmovie[:,:,:,n], (frame*(2*scan_w),2*scan_l))
-    ax[n*2].imshow((boxtile[:,:,n].T), cmap='gray')
-    ax[n*2+1].plot(np.arange(0,frame,1,dtype='int'),box_intensity[:,n], 'b')     
-    ax[n*2+1].set_xlim([0,frame])
-    ax[n*2+1].set_xlabel('frame')
     
+    boxbg = point1.mask3d(movie, pts_new[n,:], bg_scan, scan_l)
+    bgmovie[:,:,:,n] = np.append(boxbg[:,:(bg_scan-scan_w),:],boxbg[:,(bg_scan+scan_w):,:], axis=1)        
+    bgspectra[:,:,n] = np.mean(bgmovie[:,:,:,n] , axis=1)
+    bg_intensity[:,n] = np.mean(bgspectra[:,:,n], axis=1)
+    bgtile[:,:,n] = np.reshape(bgmovie[:,:,:,n], ((frame*2*(bg_scan-scan_w)),2*scan_l))    
+
+spectra_bgcr = spectra - bgspectra
+tt = box_intensity - bg_intensity
+fig, ax = plt.subplots(len(pts)*4, sharex=True, sharey=False)
+extent = [0,frame,0,scan_l*2]
+for n in range(len(pts)):
+    ax[n*4].imshow((boxtile[:,:,n].T), cmap='Reds', vmin=np.min(boxtile[:,:,n]), vmax=np.max(boxtile[:,:,n]), extent=extent, aspect ='auto', interpolation='None')
+    ax[n*4+1].imshow((bgtile[:,:,n].T), cmap='Reds', vmin=np.min(boxtile[:,:,n]), vmax=np.max(boxtile[:,:,n]), extent=extent, aspect = 'auto', interpolation='None')
+    ax[n*4+2].plot(box_intensity[:,n], 'b')     
+    ax[n*4+2].plot(bg_intensity[:,n], 'y')       
+    ax[n*4+2].set_xlim([0,frame])
+ax[n*4+2].set_xlabel('frame')
+
 """
 Blinking threshold
 """
-std = np.std(box_intensity[frame_start:,:],axis=0,ddof=1,dtype='d')
-threshold = np.mean(box_intensity[frame_start:,:], axis=0)-std/2
-box_intensity_a = box_intensity[frame_start:,:]
+std = np.std(tt[frame_start:,:],axis=0,ddof=1,dtype='d')
+threshold = np.mean(tt[frame_start:,:], axis=0)-std/2
+tt_a = tt[frame_start:,:]
 for n in range(len(pts)):
-    ax[n*2+1].axhline(y = threshold[n], c='0.3', alpha=0.1)
-    print threshold[n]
-    off_sum = []    
+    ax[n*4+3].plot(tt[:,n])
+    ax[n*4+3].axhline(y = threshold[n], c='0.3', alpha=0.1)
+    #print threshold[n]
+    off_append = []    
     for i in range(frame-frame_start):
-        if box_intensity_a[i,n] < threshold[n]:
-            off_sum = np.append(off_sum, box_intensity_a[i,n])   
-    off_mean = np.mean(off_sum)
-    off_std = np.std(off_sum,ddof=1,dtype='d')
-    threshold1 = off_mean + off_std*1.3  
+        if tt_a[i,n] < threshold[n]:
+            off_append = np.append(off_append, tt_a[i,n])   
+    off_mean = np.mean(off_append)
+    off_std = np.std(off_append,ddof=1,dtype='d')
+    threshold1 = off_mean + off_std*nstd 
     while threshold1 != threshold[n]:
         threshold[n] = threshold1
         print threshold[n]
-        ax[n*2+1].axhline(y = threshold[n], c='0.3', alpha=0.1)
-        off_sum = []    
+        ax[n*4+3].axhline(y = threshold[n], c='0.3', alpha=0.1)
+        off_append = []    
         for i in range(frame-frame_start):
-            if box_intensity_a[i,n] < threshold[n]:
-                off_sum = np.append(off_sum, box_intensity_a[i,n])   
-        off_mean = np.mean(off_sum)
-        off_std = np.std(off_sum,ddof=1,dtype='d')
-        threshold1 = off_mean + off_std*1.35
-    ax[n*2+1].axhline(y = threshold[n], c='r')
+            if tt_a[i,n] < threshold[n]:
+                off_append = np.append(off_append, tt_a[i,n])   
+        off_mean = np.mean(off_append)
+        off_std = np.std(off_append,ddof=1,dtype='d')
+        threshold1 = off_mean + off_std*nstd
+    ax[n*4+3].axhline(y = threshold[n], c='r')
+fig.canvas.draw()
+if savefig ==1:
+    fig.savefig(filePath+fileName+abc+'.fig3_tt.pdf', format='pdf', bbox_inches = 'tight')
+
 #%%
 """
 Extract Von and Voff spectra and fit Gaussian
 """
 def gauss(x, A, mu, sigma, slope, b):
     return A*np.exp(-(x-mu)**2/(2.*sigma**2))+slope*x+b
-fig, ax = plt.subplots(len(pts))
+dL = np.zeros((len(pts)))
+fig, ax = plt.subplots(len(pts), squeeze=True)
 for n in range(len(pts)):
-    Von_spec = np.mean([spectra[i,:,n] for i in range(frame) if i%2==0 and box_intensity[i,n] > threshold[n]], axis=0)
-    Voff_spec = np.mean([spectra[i,:,n] for i in range(frame) if i%2==1 and box_intensity[i,n] > threshold[n]], axis=0)    
+    Von_spec = np.mean([spectra_bgcr[i,:,n] for i in range(frame) if i%2==0 and tt[i,n] > threshold[n]], axis=0)
+    Voff_spec = np.mean([spectra_bgcr[i,:,n] for i in range(frame) if i%2==1 and tt[i,n] > threshold[n]], axis=0)    
     x = x_lambda[pts_new[n,0]-scan_l:pts_new[n,0]+scan_l]
     slope1 = (np.mean(Von_spec[scan_l*2-scan_l*2/10:])-np.mean(Von_spec[:scan_l*2/10]))/(x.max()-x.min())
     slope2 = (np.mean(Voff_spec[scan_l*2-scan_l*2/10:])-np.mean(Voff_spec[:scan_l*2/10]))/(x.max()-x.min())
     gmod = lmfit.Model(gauss)
     params1 = gmod.make_params()
     params1['A'].set(value=np.max(Von_spec), min=0)
-    params1['mu'].set(value=x_lambda[pts_new[n,0]-scan_l+int(*np.where(Von_spec == Von_spec.max()))], min=400, max=800)
+    params1['mu'].set(value=x_lambda[pts_new[n,0]-scan_l+int(*np.where(Von_spec == Von_spec.max())[0])], min=400, max=800)
     params1['sigma'].set(value=10, max=100)
     params1['slope'].set(value=slope1)
     params1['b'].set(value=np.min(Von_spec))    
@@ -289,14 +248,33 @@ for n in range(len(pts)):
     params2['b'].set(value=np.min(Voff_spec)) 
     result1 = gmod.fit(Von_spec, x=x, **params1)
     result2 = gmod.fit(Voff_spec, x=x, **params2)
-    ax[n].plot(x, Von_spec, 'ro', label='Von Data')
-    ax[n].plot(x, Voff_spec,  'bo', label='Voff Data')
-    ax[n].plot(x, gauss(x, result1.best_values['A'], result1.best_values['mu'], result1.best_values['sigma'], result1.best_values['slope'], result1.best_values['b']), '-', label='Von', color='r')
-    ax[n].plot(x, gauss(x, result2.best_values['A'], result2.best_values['mu'], result2.best_values['sigma'], result2.best_values['slope'], result2.best_values['b']), '-', label='Voff', color='b')            
+    dL[n] = result1.best_values['mu']-result2.best_values['mu']
+    ax[n].plot(x, Von_spec, 'r.', label='Von Data')
+    ax[n].plot(x, Voff_spec,  'b.', label='Voff Data')
+    ax[n].plot(x, gauss(x, result1.best_values['A'], result1.best_values['mu'], result1.best_values['sigma'], result1.best_values['slope'], result1.best_values['b']), '-', label='Von ({} nm)'.format(round(result1.best_values['mu'],3)), color='r')
+    ax[n].plot(x, gauss(x, result2.best_values['A'], result2.best_values['mu'], result2.best_values['sigma'], result2.best_values['slope'], result2.best_values['b']), '-', label='Voff ({} nm)'.format(round(result2.best_values['mu'],3)), color='b')            
+    ax[n].annotate('$\Delta$$\lambda$ = {} nm'.format(round(dL[n],3)), xy=(1,1), xytext=(0.02,0.9), xycoords='axes fraction', fontsize=12)    
     ax[n].legend(bbox_to_anchor=(1, 1), frameon=False, fontsize=10)
-    ax[n].set_xlabel('Wavelength (nm)')
+    ax[n].set_xlabel('Wavelength (nm)')    
     ax[n].set_ylabel('Intensity')
     plt.subplots_adjust(hspace = 0.5)
+
+if savefig ==1:
+    fig.savefig(filePath+fileName+abc+'.fig4_spec.pdf', format='pdf', bbox_inches = 'tight')
+print dL
+f = open(filePath+'_result.txt','a')
+for i in range(len(dL)):
+    f.write('{}\n'.format(dL[i])) # python will convert \n to os.linesep
+f.close()
+#workbook = xlsxwriter.Workbook(filePath+'{}_dL.xlsx'.format(fileName))
+#worksheet = workbook.add_worksheet()
+#worksheet.write_string(0, 0, 'dL ')
+#for n in range(len(dL)):
+#    worksheet.write(n+1, 0, dL[n])
+
+
+
+#%%
 '''
     p02 = [np.max(Voff_spec), x_lambda[pts_new[n,1]-scan_l+int(*np.where(Voff_spec == Voff_spec.max()))] , 10, slope2, np.min(Voff_spec)]    
     coeff1, var_matrix1 = curve_fit(gauss, x_lambda[pts_new[n,1]-scan_l:pts_new[n,1]+scan_l:1], Von_spec, p0=p01)

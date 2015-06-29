@@ -35,8 +35,8 @@ def localmax(refimg, pts, ax, fig):
     for i in range(len(pts)):
         local = mask(refimg, pts[i,:],scan_w, scan_l)
         a = np.array(zip(*np.where(local == local.max())))   # * unpack the tuple, return its value as an input element of zip)
-        pts_new[i,0] = pts[i,0]-scan_l+a[0,1]
-        pts_new[i,1] = pts[i,1]-scan_w+a[0,0]        
+        pts_new[i,0] = int(pts[i,0]-scan_l+a[0,1])
+        pts_new[i,1] = int(pts[i,1]-scan_w+a[0,0])       
         
     ax.plot(pts_new[:,0], pts_new[:,1], 'y+', markersize=25)
     ax.plot((pts[:,0]-scan_l, pts[:,0]-scan_l, pts[:,0]+scan_l, pts[:,0]+scan_l, pts[:,0]-scan_l), 
