@@ -29,11 +29,11 @@ def x_lambda(lamp, c1, c2, c3, x):
     c2ds = movingaverage(c2d, window_size)
     c3ds = movingaverage(c3d, window_size)
     slope_max = np.zeros((5,2))
-    slope_max[0,0] = int(*np.where(c1ds == np.max(c1ds[100:350])))    
-    slope_max[1,0] = int(*np.where(c1ds == np.min(c1ds[100:350])))
-    slope_max[2,0] = int(*np.where(c2ds == np.max(c2ds[100:350])))
-    slope_max[3,0] = int(*np.where(c3ds == np.max(c3ds[100:350])))
-    slope_max[4,0] = int(*np.where(c3ds == np.min(c3ds[100:350])))
+    slope_max[0,0] = int(*np.where(c1ds == np.max(c1ds[200:300])))    
+    slope_max[1,0] = int(*np.where(c1ds == np.min(c1ds[200:300])))
+    slope_max[2,0] = int(*np.where(c2ds == np.max(c2ds[280:350])))
+    slope_max[3,0] = int(*np.where(c3ds == np.max(c3ds[170:270])))
+    slope_max[4,0] = int(*np.where(c3ds == np.min(c3ds[170:270])))
     slope_max[:,1] = [580,620,700,550,630]
     print slope_max
     y = slope_max[:, 0]
