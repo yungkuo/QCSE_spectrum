@@ -12,38 +12,16 @@ import matplotlib.animation as animation
 from sub import point1, lambda_cali_v1
 #from scipy.ndimage.filters import gaussian_filter1d
 #from scipy.optimize import curve_fit
-#import lmfit
+import lmfit
 #import xlsxwriter
 
 """
 Control Panel
 """
-<<<<<<< HEAD
-filePath='E:/QCSE data/092215ZnSeCdS 10nm rod 828/'
-#filePath = '/Users/yung/Documents/Data/QCSE/092215ZnSeCdS 10nm rod 828/'
-fileName='001-120V'
-abc = 'a'
-=======
-filePath='E:/ND/092315/'
-#filePath = '/Users/yungkuo/Documents/Data/061115 CdSe(Te)@CdS/'
-fileName='30V_0.4Hz'
-abc = 'a'
-<<<<<<< HEAD
-=======
-=======
 #filePath='E:/NPLs spectrum/150522/'
-<<<<<<< HEAD
-filePath = '/Users/yungkuo/Documents/Data/QCSE/092115 ZnSeCdS 10nm rod/'
-fileName='007-120V'
-abc = 'a'
-=======
 filePath = '/Users/yungkuo/Documents/Data/061115 CdSe(Te)@CdS/'
 fileName='4_120V'
 abc = 'a1'
->>>>>>> origin/master
->>>>>>> origin/master
->>>>>>> origin/master
->>>>>>> origin/master
 savefig = 1         # 1 = Yes, save figures, else = No, don't save
 frame_start = 2
 scan_w = 4          # extract scan_w*2 pixels in width(perpendicular to spectral diffusion line) around QD
