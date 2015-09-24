@@ -14,8 +14,8 @@ from sub import point1, lambda_cali_v1
 Control Panel
 """
 #filePath='E:/ND/092315/'
-filePath = '/Users/yungkuo/Documents/Data/ND/092315/'
-fileName='42V_4Hz'
+filePath = '/Users/yungkuo/Documents/Data/ND/092415/'
+fileName='67V_4Hz'
 abc = 'a'
 savefig = 1         # 1 = Yes, save figures, else = No, don't save
 frame_start = 2
