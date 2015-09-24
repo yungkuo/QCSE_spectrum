@@ -20,17 +20,17 @@ Control Panel
 """
 filePath='E:/ND/092315/'
 #filePath = '/Users/yungkuo/Documents/Data/061115 CdSe(Te)@CdS/'
-fileName='30V_0.4Hz'
+fileName='20V_0.4Hz'
 abc = 'a'
 savefig = 1         # 1 = Yes, save figures, else = No, don't save
 frame_start = 2
 scan_w = 6          # extract scan_w*2 pixels in width(perpendicular to spectral diffusion line) around QD
-scan_l = 100         # extract scan_l*2 pixels in length = spectral width
-bg_scan = scan_w+12
+displacement = scan_w*2
 playmovie = 0       # 1 = Yes, play movie, else = No, don't play
 mean_fig = 1        # 1 = display mean movie image, 2 = display mean(log) image, else = display differencial image
 nstd = 1.8
 assignQDcoor = 0
+lambdax = 0
 """
 Import movie; Define parameters
 """
@@ -142,53 +142,23 @@ else:
     ax.plot(pts[:,0], pts[:,1], 'r+')
 ax.set_xlim(0, col)
 ax.set_ylim(row, 0)
-ax.plot((pts_new[:,0]-scan_l, pts_new[:,0]-scan_l, pts_new[:,0]+scan_l, pts_new[:,0]+scan_l,pts_new[:,0]-scan_l),
-        (pts_new[:,1]+scan_w, pts_new[:,1]-scan_w, pts_new[:,1]-scan_w, pts_new[:,1]+scan_w,pts_new[:,1]+scan_w), '-+', color='b')
-ax.plot((pts_new[:,0]-scan_l, pts_new[:,0]-scan_l, pts_new[:,0]+scan_l, pts_new[:,0]+scan_l,pts_new[:,0]-scan_l),
-        (pts_new[:,1]+bg_scan, pts_new[:,1]-bg_scan, pts_new[:,1]-bg_scan, pts_new[:,1]+bg_scan,pts_new[:,1]+bg_scan), '-+', color='c', alpha=0.5)
-
+for i in range(len(pts)):
+    ax.axhline(y=pts_new[i,1]-scan_w, xmin=0, xmax=col)
+    ax.axhline(y=pts_new[i,1]+scan_w, xmin=0, xmax=col)
 fig.canvas.draw()
 if savefig ==1:
-    plt.savefig(filePath+fileName+abc+'.fig2_QD.pdf', format='pdf')
+    plt.savefig(filePath+fileName+abc+'.fig2_ND.pdf', format='pdf')
 
 #%%
 """
 Extract spectra and background around points of interest (QD); Background correction
 """
-boxmovie = np.zeros((frame, 2*scan_w, 2*scan_l, len(pts)))
-bgmovie = np.zeros((frame, 2*(bg_scan-scan_w), 2*scan_l, len(pts)))
-spectra = np.zeros((frame, 2*scan_l, len(pts)))
-bgspectra = np.zeros((frame, 2*scan_l, len(pts)))
-box_intensity = np.zeros((frame, len(pts)))
-bg_intensity = np.zeros((frame, len(pts)))
-boxtile = np.zeros((frame*(2*scan_w),2*scan_l, len(pts)))
-bgtile = np.zeros((frame*(2*(bg_scan-scan_w)),2*scan_l, len(pts)))
+spectra = np.zeros((frame, col, len(pts)))
+bgspectra = np.zeros((frame, col, len(pts)))
 for n in range(len(pts)):
-    boxmovie[:,:,:,n] = point1.mask3d(movie, pts_new[n,:], scan_w, scan_l)
-    spectra[:,:,n] = np.mean(boxmovie[:,:,:,n] , axis=1)
-    box_intensity[:,n] = np.mean(spectra[:,:,n], axis=1)
-    boxtile[:,:,n] = np.reshape(boxmovie[:,:,:,n], (frame*(2*scan_w),2*scan_l))
-
-    boxbg = point1.mask3d(movie, pts_new[n,:], bg_scan, scan_l)
-    bgmovie[:,:,:,n] = np.append(boxbg[:,:(bg_scan-scan_w),:],boxbg[:,(bg_scan+scan_w):,:], axis=1)
-    bgspectra[:,:,n] = np.mean(bgmovie[:,:,:,n] , axis=1)
-    bg_intensity[:,n] = np.mean(bgspectra[:,:,n], axis=1)
-    bgtile[:,:,n] = np.reshape(bgmovie[:,:,:,n], ((frame*2*(bg_scan-scan_w)),2*scan_l))
-
+    spectra[:,:,n] = np.mean(movie[:,pts_new[n,1]-scan_w:pts_new[n,1]+scan_w,:] , axis=1)
+    bgspectra[:,:,n] = np.mean(movie[:,pts_new[n,1]-scan_w-displacement:pts_new[n,1]+scan_w-displacement,:] , axis=1)
 spectra_bgcr = spectra - bgspectra
-tt = box_intensity - bg_intensity
-fig, ax = plt.subplots(len(pts)*4, sharex=True, sharey=False)
-extent = [0,frame,0,scan_l*2]
-for n in range(len(pts)):
-    ax[n*4].imshow((boxtile[:,:,n].T), cmap='Reds', vmin=np.min(boxtile[:,:,n]), vmax=np.max(boxtile[:,:,n]), extent=extent, aspect ='auto', interpolation='None')
-    ax[n*4+1].imshow((bgtile[:,:,n].T), cmap='Reds', vmin=np.min(boxtile[:,:,n]), vmax=np.max(boxtile[:,:,n]), extent=extent, aspect = 'auto', interpolation='None')
-    ax[n*4+2].plot(box_intensity[:,n], 'b')
-    ax[n*4+2].plot(bg_intensity[:,n], 'y')
-    ax[n*4+2].set_xlim([0,frame])
-ax[n*4+2].set_xlabel('frame')
-if savefig ==1:
-    fig.savefig(filePath+fileName+abc+'.fig3_tt.pdf', format='pdf', bbox_inches = 'tight')
-
 #%%
 """
 Extract Von and Voff spectra 
@@ -197,15 +167,19 @@ fig, ax = plt.subplots(len(pts), squeeze=True)
 for n in range(len(pts)):
     Von_spec = np.mean([spectra_bgcr[i,:,n] for i in range(frame) if i%2==0],  axis=0)
     Voff_spec = np.mean([spectra_bgcr[i,:,n] for i in range(frame) if i%2==0], axis=0)
-    x = x_lambda[pts_new[n,0]-scan_l:pts_new[n,0]+scan_l]
-    slope1 = (np.mean(Von_spec[scan_l*2-scan_l*2/10:])-np.mean(Von_spec[:scan_l*2/10]))/(x.max()-x.min())
-    slope2 = (np.mean(Voff_spec[scan_l*2-scan_l*2/10:])-np.mean(Voff_spec[:scan_l*2/10]))/(x.max()-x.min())
+    if lambdax == 1:
+        x = x_lambda
+    else:
+        x = x
     ax[n].plot(x, Von_spec, '-r.', label='Von Data')
     ax[n].plot(x, Voff_spec,  'b.', label='Voff Data')
     ax[n].legend(bbox_to_anchor=(1, 1), frameon=False, fontsize=10)
-    ax[n].set_xlabel('Wavelength (nm)')
+    if lambdax == 1:    
+        ax[n].set_xlabel('Wavelength (nm)')
+    else:
+        ax[n].set_xlabel('pixel')
     ax[n].set_ylabel('Intensity')
     plt.subplots_adjust(hspace = 0.5)
 
 if savefig ==1:
-    fig.savefig(filePath+fileName+abc+'.fig4_spec.pdf', format='pdf', bbox_inches = 'tight')
+    fig.savefig(filePath+fileName+abc+'.fig3_spec.pdf', format='pdf', bbox_inches = 'tight')
