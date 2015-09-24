@@ -18,23 +18,10 @@ import lmfit
 """
 Control Panel
 """
-<<<<<<< HEAD
 filePath='E:/QCSE data/092215ZnSeCdS 10nm rod 828/'
 #filePath = '/Users/yung/Documents/Data/QCSE/092215ZnSeCdS 10nm rod 828/'
 fileName='001-120V'
 abc = 'a'
-=======
-#filePath='E:/NPLs spectrum/150522/'
-<<<<<<< HEAD
-filePath = '/Users/yungkuo/Documents/Data/QCSE/092115 ZnSeCdS 10nm rod/'
-fileName='007-120V'
-abc = 'a'
-=======
-filePath = '/Users/yungkuo/Documents/Data/061115 CdSe(Te)@CdS/'
-fileName='4_120V'
-abc = 'a1'
->>>>>>> origin/master
->>>>>>> origin/master
 savefig = 1         # 1 = Yes, save figures, else = No, don't save
 frame_start = 2
 scan_w = 4          # extract scan_w*2 pixels in width(perpendicular to spectral diffusion line) around QD
@@ -71,49 +58,28 @@ mov = libtiff.TiffFile(c1)
 c1 = mov.get_tiff_array()
 #fig, ax = plt.subplots()
 #ax.imshow(np.array(c1[0,:,:]))
-<<<<<<< HEAD
-c1 = np.mean(c1[0,50:,:],dtype='d', axis=0)-np.mean(c1[0,0:20,:],dtype='d', axis=0)
-#ax.plot(x,c1)
-=======
 c1 = np.mean(c1[0,50:,:],dtype='d', axis=0)-np.mean(c1[0,0:2,:],dtype='d', axis=0)
->>>>>>> origin/master
 
 c2 = filePath+'c2.tif'
 mov = libtiff.TiffFile(c2)
 c2 = mov.get_tiff_array()
 #fig, ax = plt.subplots()
 #ax.imshow(np.array(c2[0,:,:]))
-<<<<<<< HEAD
-c2 = np.mean(c2[0,50:,:],dtype='d', axis=0)-np.mean(c2[0,0:20,:],dtype='d', axis=0)
-#ax.plot(x,c2)
-=======
 c2 = np.mean(c2[0,50:,:],dtype='d', axis=0)-np.mean(c2[0,0:2,:],dtype='d', axis=0)
->>>>>>> origin/master
 
 c3 = filePath+'c3.tif'
 mov = libtiff.TiffFile(c3)
 c3 = mov.get_tiff_array()
 #fig, ax = plt.subplots()
 #ax.imshow(np.array(c3[0,:,:]))
-<<<<<<< HEAD
-c3 = np.mean(c3[0,50:,:],dtype='d', axis=0)-np.mean(c3[0,0:20,:],dtype='d', axis=0)
-#ax.plot(x,c3)
-=======
 c3 = np.mean(c3[0,50:,:],dtype='d', axis=0)-np.mean(c3[0,0:2,:],dtype='d', axis=0)
->>>>>>> origin/master
 
 lamp = filePath+'lamp.tif'
 mov = libtiff.TiffFile(lamp)
 lamp = mov.get_tiff_array()
 #fig, ax = plt.subplots()
 #ax.imshow(np.array(lamp[0,:,:]))
-<<<<<<< HEAD
-lamp = np.mean(lamp[0,20:,:],dtype='d', axis=0)-np.mean(lamp[0,0:20,:],dtype='d', axis=0)
-#ax.plot(x,lamp)
-=======
 lamp = np.mean(lamp[0,20:,:],dtype='d', axis=0)-np.mean(lamp[0,0:2,:],dtype='d', axis=0)
-
->>>>>>> origin/master
 
 x_lambda = lambda_cali_v1.x_lambda(lamp, c1, c2, c3, x)
 if savefig == 1:
