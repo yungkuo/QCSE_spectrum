@@ -19,18 +19,18 @@ import lmfit
 Control Panel
 """
 #filePath='E:/NPLs spectrum/150522/'
-filePath = '/Users/yungkuo/Documents/Data/061115 CdSe(Te)@CdS/'
-fileName='4_120V'
-abc = 'a1'
+filePath = '/Users/yungkuo/Documents/Data/QCSE/092115 ZnSeCdS 10nm rod/'
+fileName='007-120V'
+abc = 'a'
 savefig = 1         # 1 = Yes, save figures, else = No, don't save
 frame_start = 2
-scan_w = 6          # extract scan_w*2 pixels in width(perpendicular to spectral diffusion line) around QD
+scan_w = 4          # extract scan_w*2 pixels in width(perpendicular to spectral diffusion line) around QD
 scan_l = 35         # extract scan_l*2 pixels in length = spectral width
-bg_scan = scan_w+3
+bg_scan = scan_w+2
 playmovie = 0       # 1 = Yes, play movie, else = No, don't play
-mean_fig = 1        # 1 = display mean movie image, 2 = display mean(log) image, else = display differencial image
+mean_fig = 2        # 1 = display mean movie image, 2 = display mean(log) image, else = display differencial image
 nstd = 1.8
-assignQDcoor = 1
+assignQDcoor = 0
 """
 Import movie; Define parameters
 """
@@ -44,11 +44,10 @@ col = len(movie[0,0,:])
 dt = 0.125
 movie[0:frame_start,:,:] = movie[frame_start,:,:]
 x = np.arange(0,col,1)
-coor = np.array([[259, 332],
-[312, 164],
-
-
-])
+if assignQDcoor ==1:
+    coor = np.array([[259, 332],
+    [312, 164],
+    ])
 
 #%%
 """
@@ -60,6 +59,7 @@ c1 = mov.get_tiff_array()
 #fig, ax = plt.subplots()
 #ax.imshow(np.array(c1[0,:,:]))
 c1 = np.mean(c1[0,50:,:],dtype='d', axis=0)-np.mean(c1[0,0:20,:],dtype='d', axis=0)
+#ax.plot(x,c1)
 
 c2 = filePath+'c2.tif'
 mov = libtiff.TiffFile(c2)
@@ -67,6 +67,7 @@ c2 = mov.get_tiff_array()
 #fig, ax = plt.subplots()
 #ax.imshow(np.array(c2[0,:,:]))
 c2 = np.mean(c2[0,50:,:],dtype='d', axis=0)-np.mean(c2[0,0:20,:],dtype='d', axis=0)
+#ax.plot(x,c2)
 
 c3 = filePath+'c3.tif'
 mov = libtiff.TiffFile(c3)
@@ -74,6 +75,7 @@ c3 = mov.get_tiff_array()
 #fig, ax = plt.subplots()
 #ax.imshow(np.array(c3[0,:,:]))
 c3 = np.mean(c3[0,50:,:],dtype='d', axis=0)-np.mean(c3[0,0:20,:],dtype='d', axis=0)
+#ax.plot(x,c3)
 
 lamp = filePath+'lamp.tif'
 mov = libtiff.TiffFile(lamp)
@@ -81,7 +83,7 @@ lamp = mov.get_tiff_array()
 #fig, ax = plt.subplots()
 #ax.imshow(np.array(lamp[0,:,:]))
 lamp = np.mean(lamp[0,20:,:],dtype='d', axis=0)-np.mean(lamp[0,0:20,:],dtype='d', axis=0)
-
+#ax.plot(x,lamp)
 
 x_lambda = lambda_cali_v1.x_lambda(lamp, c1, c2, c3, x)
 if savefig == 1:
@@ -179,8 +181,8 @@ tt = box_intensity - bg_intensity
 fig, ax = plt.subplots(len(pts)*4, sharex=True, sharey=False)
 extent = [0,frame,0,scan_l*2]
 for n in range(len(pts)):
-    ax[n*4].imshow((boxtile[:,:,n].T), cmap='Reds', vmin=np.min(boxtile[:,:,n]), vmax=np.max(boxtile[:,:,n]), extent=extent, aspect ='auto', interpolation='None')
-    ax[n*4+1].imshow((bgtile[:,:,n].T), cmap='Reds', vmin=np.min(boxtile[:,:,n]), vmax=np.max(boxtile[:,:,n]), extent=extent, aspect = 'auto', interpolation='None')
+    ax[n*4].imshow((boxtile[:,:,n].T), cmap='gray', vmin=np.min(boxtile[:,:,n]), vmax=np.max(boxtile[:,:,n]), extent=extent, aspect ='auto', interpolation='None')
+    ax[n*4+1].imshow((bgtile[:,:,n].T), cmap='gray', vmin=np.min(boxtile[:,:,n]), vmax=np.max(boxtile[:,:,n]), extent=extent, aspect = 'auto', interpolation='None')
     ax[n*4+2].plot(box_intensity[:,n], 'b')
     ax[n*4+2].plot(bg_intensity[:,n], 'y')
     ax[n*4+2].set_xlim([0,frame])
