@@ -15,7 +15,7 @@ Control Panel
 """
 #filePath='E:/ND/092315/'
 filePath = '/Users/yungkuo/Documents/Data/ND/092415/'
-fileName='67V_4Hz'
+fileName='0_2V_4Hz'
 abc = 'a'
 savefig = 1         # 1 = Yes, save figures, else = No, don't save
 frame_start = 2
@@ -23,7 +23,6 @@ scan_w = 6          # extract scan_w*2 pixels in width(perpendicular to spectral
 displacement = scan_w*2
 playmovie = 0       # 1 = Yes, play movie, else = No, don't play
 mean_fig = 1        # 1 = display mean movie image, 2 = display mean(log) image, else = display differencial image
-nstd = 1.8
 assignQDcoor = 0
 lambdax = 1
 """
@@ -159,7 +158,7 @@ Extract Von and Voff spectra
 """
 fig, ax = plt.subplots(len(pts), squeeze=True)
 for n in range(len(pts)):
-    Von_spec = np.mean([spectra_bgcr[i,:,n] for i in range(frame) if i%2==0],  axis=0)
+    Von_spec = np.mean([spectra_bgcr[i,:,n] for i in range(frame) if i%2==1],  axis=0)
     Voff_spec = np.mean([spectra_bgcr[i,:,n] for i in range(frame) if i%2==0], axis=0)
     np.save(filePath+fileName+abc+'{}_'.format(n)+'specs.npy', np.append(Von_spec,Voff_spec).reshape(2,col))
     if lambdax == 1:

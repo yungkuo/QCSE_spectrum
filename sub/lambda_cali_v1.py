@@ -28,11 +28,11 @@ def x_lambda(lamp, c1, c2, c3, x):
     c2ds = movingaverage(c2d, window_size)
     c3ds = movingaverage(c3d, window_size)
     slope_max = np.zeros((5,2))
-    slope_max[0,0] = int(*np.where(c1ds == np.max(c1ds[0:140])))
-    slope_max[1,0] = int(*np.where(c1ds == np.min(c1ds[220:260])))
-    slope_max[2,0] = int(*np.where(c2ds == np.max(c2ds[260:320])))
-    slope_max[3,0] = int(*np.where(c3ds == np.max(c3ds[0:160])))
-    slope_max[4,0] = int(*np.where(c3ds == np.min(c3ds[240:280])))
+    slope_max[0,0] = int(*np.where(c1ds == np.max(c1ds[200:280])))
+    slope_max[1,0] = int(*np.where(c1ds == np.min(c1ds[280:350])))
+    slope_max[2,0] = int(*np.where(c2ds == np.max(c2ds[300:380])))
+    slope_max[3,0] = int(*np.where(c3ds == np.max(c3ds[200:280])))
+    slope_max[4,0] = int(*np.where(c3ds == np.min(c3ds[280:350])))
     slope_max[:,1] = [580,620,700,550,630]
     print slope_max
     y = slope_max[:, 0]
@@ -63,8 +63,8 @@ def x_lambda(lamp, c1, c2, c3, x):
         ax[2].plot(y, slope_max[:, 1], 'ro')
         ax[0].set_ylabel('%T')
         ax[1].set_ylabel('dT')
-        #ax[0].set_ylim(np.min(c3T[slope_max[:, 0].min()-50:slope_max[:, 0].max()+50]), np.max(c3T[slope_max[:, 0].min()-50: slope_max[:, 0].max()+50]))
-        #ax[1].set_ylim(np.min(c3d[slope_max[:, 0].min()-50:slope_max[:, 0].max()+50]), np.max(c3d[slope_max[:, 0].min()-50: slope_max[:, 0].max()+50]))
+        ax[0].set_ylim(np.min(c3T[slope_max[:, 0].min()-50:slope_max[:, 0].max()+50]), np.max(c3T[slope_max[:, 0].min()-50: slope_max[:, 0].max()+50]))
+        ax[1].set_ylim(np.min(c3d[slope_max[:, 0].min()-50:slope_max[:, 0].max()+50]), np.max(c3d[slope_max[:, 0].min()-50: slope_max[:, 0].max()+50]))
         ax[2].set_ylabel('Wavelength (nm)')
         ax[2].set_xlim(slope_max[:, 0].min()-50, slope_max[:, 0].max()+50)
         ax[2].set_ylim(400, 800)
@@ -74,4 +74,4 @@ def x_lambda(lamp, c1, c2, c3, x):
         ax[1].legend(loc=2, frameon='None', fontsize=10)
     else:
         print 'Failed'
-    return p
+    return p, fig
