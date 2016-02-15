@@ -9,37 +9,48 @@ import numpy as np
 import matplotlib.pyplot as plt
 import libtiff
 import matplotlib.animation as animation
-from sub import point1, lambda_cali_v1
+from sub import point1, lambda_cali_v2
 #from scipy.ndimage.filters import gaussian_filter1d
 #from scipy.optimize import curve_fit
 import lmfit
 import pandas as pd
 """
-Control Panel
+Import files
 """
 #filePath='E:/NPLs spectrum/150522/'
-filePath = '/Users/yungkuo/Documents/Data/QCSE/101315 ZnSeCdS 10nm rod 928/8.83mW/'
-fileName = '003-120V'
+filePath = '/Users/yungkuo/Google Drive/021016 QCSE Mn doped QD/'
+fileName = 'MnQD_7'
+c1 = '510.20.tif'
+c2 = '590.80.tif'
+c3 = '600.40.tif'
+lamp = 'lamp.tif'
+"""
+Control panel
+"""
 framerate = 8       # in unit of Hz
 frame_start = 2
-frame_stop = 600
+frame_stop = 300
 scan_w = 4          # extract scan_w*2 pixels in width(perpendicular to spectral diffusion line) around QD
-scan_l = 35         # extract scan_l*2 pixels in length = spectral width
+scan_l = 70         # extract scan_l*2 pixels in length = spectral width
 bg_scan = scan_w
 displacement = [0,scan_w*(2)]
+plot_cali = 1
 playmovie = 0       # 1 = Yes, play movie, else = No, don't play
 mean_fig = 2        # 1 = display mean movie image, 2 = display mean(log) image, else = display differencial image
-nstd = 0            # set blinking threshold to mean(blink off)+std(blink off)*nstd
+nstd = 1            # set blinking threshold to mean(blink off)+std(blink off)*nstd
 assignQDcoor = 0
+QDcoor = np.array([])
 savefig = 1         # 1 = Yes, save figures, else = No, don't save
-abc = 'd'
+abc = 'a'
+#%%
 """
 Import movie; Define parameters
 """
-mov = libtiff.TiffFile(filePath+fileName+'.tif')
+datapath = filePath+'raw data/'
+mov = libtiff.TiffFile(datapath+fileName+'.tif')
 movie = mov.get_tiff_array()
-movie = np.array(movie[:frame_stop,:,:],dtype='d')
-
+movie = np.array(movie[:frame_stop,:,:], dtype='d')
+movie = np.transpose(movie, (0,2,1))[:]
 frame = len(movie[:,0,0])
 row = len(movie[0,:,0])
 col = len(movie[0,0,:])
@@ -47,43 +58,19 @@ dt = 1/framerate
 movie[0:frame_start,:,:] = np.zeros((row, col))
 x = np.arange(0,col,1)
 x_frame = np.arange(0,frame,1)
-if assignQDcoor == 1:
-    coor = np.array([])
+if assignQDcoor == 0:
+    coor = QDcoor
 
 #%%
 """
 Calibrating wavelength
 """
-c1 = filePath+'c1.tif'
-mov = libtiff.TiffFile(c1)
-c1 = mov.get_tiff_array()
-#fig, ax = plt.subplots()
-#ax.imshow(np.array(c1[0,:,:]))
-c1 = np.mean(c1[0,50:230,:],dtype='d', axis=0)-np.mean(c1[0,0:2,:],dtype='d', axis=0)
-
-c2 = filePath+'c2.tif'
-mov = libtiff.TiffFile(c2)
-c2 = mov.get_tiff_array()
-#fig, ax = plt.subplots()
-#ax.imshow(np.array(c2[0,:,:]))
-c2 = np.mean(c2[0,50:230,:],dtype='d', axis=0)-np.mean(c2[0,0:2,:],dtype='d', axis=0)
-
-c3 = filePath+'c3.tif'
-mov = libtiff.TiffFile(c3)
-c3 = mov.get_tiff_array()
-#fig, ax = plt.subplots()
-#ax.imshow(np.array(c3[0,:,:]))
-c3 = np.mean(c3[0,50:230,:],dtype='d', axis=0)-np.mean(c3[0,0:2,:],dtype='d', axis=0)
-
-lamp = filePath+'lamp.tif'
-mov = libtiff.TiffFile(lamp)
-lamp = mov.get_tiff_array()
-#fig, ax = plt.subplots()
-#ax.imshow(np.array(lamp[0,:,:]))
-lamp = np.mean(lamp[0,20:230,:],dtype='d', axis=0)-np.mean(lamp[0,0:2,:],dtype='d', axis=0)
-
-x_lambda, fig1 = lambda_cali_v1.x_lambda(lamp, c1, c2, c3, x)
-
+c1 = datapath + c1
+c2 = datapath + c2
+c3 = datapath + c3
+lamp = datapath + lamp
+x_lambda, fig1 = lambda_cali_v2.x_lambda(lamp, c1, c2, c3, plot_cali, x)
+x_lambda = x_lambda[::-1]
 #%%
 """
 Play movie
@@ -234,9 +221,9 @@ for n in range(len(pts)):
     dL['NR#{}'.format(n)] = deltaL
     ax[n].plot(x, Von_specm, 'r.', label='Von Data')
     ax[n].plot(x, Voff_specm, 'b.', label='Voff Data')
-    ax[n].plot(x, gauss(x, result1.best_values['A'], result1.best_values['mu'], result1.best_values['sigma'], result1.best_values['slope'], result1.best_values['b']), '-', label='Von ({} nm)'.format(round(result1.best_values['mu'],3)), color='r')
-    ax[n].plot(x, gauss(x, result2.best_values['A'], result2.best_values['mu'], result2.best_values['sigma'], result2.best_values['slope'], result2.best_values['b']), '-', label='Voff ({} nm)'.format(round(result2.best_values['mu'],3)), color='b')
-    ax[n].annotate('$\Delta$$\lambda$ = {} nm'.format(round(deltaL,3)), xy=(1,1), xytext=(0.02,0.9), xycoords='axes fraction', fontsize=12)
+    #ax[n].plot(x, gauss(x, result1.best_values['A'], result1.best_values['mu'], result1.best_values['sigma'], result1.best_values['slope'], result1.best_values['b']), '-', label='Von ({} nm)'.format(round(result1.best_values['mu'],3)), color='r')
+    #ax[n].plot(x, gauss(x, result2.best_values['A'], result2.best_values['mu'], result2.best_values['sigma'], result2.best_values['slope'], result2.best_values['b']), '-', label='Voff ({} nm)'.format(round(result2.best_values['mu'],3)), color='b')
+    #ax[n].annotate('$\Delta$$\lambda$ = {} nm'.format(round(deltaL,3)), xy=(1,1), xytext=(0.02,0.9), xycoords='axes fraction', fontsize=12)
     ax[n].legend(bbox_to_anchor=(1, 1), frameon=False, fontsize=10)
     ax[n].set_xlabel('Wavelength (nm)')
     ax[n].set_ylabel('Intensity')
@@ -249,11 +236,11 @@ for n in range(len(pts)):
 
 #%%
 if savefig ==1:
-    fig1.savefig(filePath+'fig1_calibration.pdf', format='pdf',bbox_inches = 'tight')
-    fig2.savefig(filePath+fileName+abc+'.fig2_QD.pdf', format='pdf', bbox_inches = 'tight')
-    fig3.savefig(filePath+fileName+abc+'.fig3_tt.pdf', format='pdf', bbox_inches = 'tight')
-    fig4.savefig(filePath+fileName+abc+'.fig4_spec.pdf', format='pdf', bbox_inches = 'tight')
-    fig5.savefig(filePath+fileName+abc+'.fig5_pp hist.pdf', format='pdf', bbox_inches = 'tight')
+    fig1.savefig(filePath+'results/'+'fig1_calibration.pdf', format='pdf',bbox_inches = 'tight')
+    fig2.savefig(filePath+'results/'+fileName+abc+'.fig2_QD.pdf', format='pdf', bbox_inches = 'tight')
+    fig3.savefig(filePath+'results/'+fileName+abc+'.fig3_tt.pdf', format='pdf', bbox_inches = 'tight')
+    fig4.savefig(filePath+'results/'+fileName+abc+'.fig4_spec.pdf', format='pdf', bbox_inches = 'tight')
+    fig5.savefig(filePath+'results/'+fileName+abc+'.fig5_pp hist.pdf', format='pdf', bbox_inches = 'tight')
 print dL
 f = open(filePath+'_result.txt','a')
 f.write('{},'.format(fileName)+'{},'.format(abc)+'{}\n'.format(dL)) # python will convert \n to os.linesep
