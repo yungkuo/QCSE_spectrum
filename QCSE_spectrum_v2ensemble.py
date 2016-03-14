@@ -7,19 +7,21 @@ Created on Tue Nov 11 21:30:02 2014
 
 import numpy as np
 import matplotlib.pyplot as plt
-import libtiff
+#import libtiff
 import matplotlib.animation as animation
-from sub import point1, lambda_cali_v2
+from sub import lambda_cali_v2
 #from scipy.ndimage.filters import gaussian_filter1d
 #from scipy.optimize import curve_fit
-import lmfit
-import pandas as pd
+#import lmfit
+import tifffile as tff
+from matplotlib.ticker import FormatStrFormatter
+#import pandas as pd
 """
 Import files
 """
 #filePath='E:/NPLs spectrum/150522/'
-filePath = '/Users/yungkuo/Google Drive/030916 869B/'
-fileName = '869B_017'
+filePath = '/Users/yungkuo/Google Drive/030716 sandwich device_13.4V_32onm thick/'
+fileName = '40nmCdSeCdS_002'
 c1 = '510.20.tif'
 c2 = '590.80.tif'
 c3 = '600.40.tif'
@@ -27,40 +29,29 @@ lamp = 'lamp.tif'
 """
 Control panel
 """
-wavelength_range = (550,630)
 framerate = 8       # in unit of Hz
 frame_start = 2
 frame_stop = 300
-scan_w = 3          # extract scan_w*2 pixels in width(perpendicular to spectral diffusion line) around QD
-scan_l = 30         # extract scan_l*2 pixels in length = spectral width
+scan_w = 4          # extract scan_w*2 pixels in width(perpendicular to spectral diffusion line) around QD
+scan_l = 60         # extract scan_l*2 pixels in length = spectral width
 bg_scan = scan_w
-displacement = [0,scan_w*(-2)]
+displacement = [0,scan_w*(2)]
 plot_cali = 0
 playmovie = 0       # 1 = Yes, play movie, else = No, don't play
-mean_fig = 2        # 1 = display mean movie image, 2 = display mean(log) image, else = display differencial image
-nstd = 1.2            # set blinking threshold to mean(blink off)+std(blink off)*nstd
-assignQDcoor = 0
-QDcoor = np.array([])
-savefig = 1         # 1 = Yes, save figures, else = No, don't save
+nstd = 1            # set blinking threshold to mean(blink off)+std(blink off)*nstd
+savefig = 0         # 1 = Yes, save figures, else = No, don't save
 abc = 'a'
 #%%
 """
 Import movie; Define parameters
 """
 datapath = filePath+'raw data/'
-mov = libtiff.TiffFile(datapath+fileName+'.tif')
-movie = mov.get_tiff_array()
-movie = np.array(movie[:frame_stop,:,:], dtype='d')
-#movie = np.transpose(movie, (0,2,1))[:]
-frame = len(movie[:,0,0])
-row = len(movie[0,:,0])
-col = len(movie[0,0,:])
+tiffimg = tff.TiffFile(datapath+fileName+'.tif')
+data = tiffimg.asarray().shape
+frame = data[0]
+movie = tiffimg.asarray()
 dt = 1/framerate
-movie[0:frame_start,:,:] = np.zeros((row, col))
-x = np.arange(0,col,1)
-x_frame = np.arange(0,frame,1)
-if assignQDcoor == 0:
-    coor = QDcoor
+movie[0:frame_start,:,:] = np.zeros((data[1], data[2]))
 
 #%%
 """
@@ -70,6 +61,7 @@ c1 = datapath + c1
 c2 = datapath + c2
 c3 = datapath + c3
 lamp = datapath + lamp
+x = np.arange(0,data[2],1)
 x_lambda, fig1 = lambda_cali_v2.x_lambda(lamp, c1, c2, c3, plot_cali, x)
 x_lambda = x_lambda[::-1]
 #%%
@@ -84,57 +76,67 @@ if playmovie == 1:
         ims.append([im])
     ani = animation.ArtistAnimation(fig, ims, interval=dt, blit=True, repeat_delay=1000)
     plt.title('movie')
-"""
-Define points (QDs) of interest, and their peak position
-"""
-fig2, ax = plt.subplots(figsize=(10,10))
-fig2.tight_layout()
-if assignQDcoor == 1:
-    pts = coor
-    pts_new = coor
-    mean_I = np.mean(movie, axis=0)
-    ax.imshow(mean_I, cmap='gray', interpolation='None')
-    ax.set_title('Mean image (assign coordinates)')
-else:
-    if mean_fig == 1:
-        mean_I = np.mean(movie, axis=0)
-        ax.imshow(mean_I, cmap='gray', interpolation='None')
-        ax.set_title('Mean image')
-    elif mean_fig == 2:
-        logmean_I = np.mean(np.log(movie[frame_start:,:,:]), axis=0)
-        ax.imshow(logmean_I, cmap='gray', interpolation='None')
-        ax.set_title('Mean(log) image')
-    else:
-        diff_I = np.mean(np.diff(movie, axis=0), axis=0)
-        ax.imshow(diff_I, cmap='gray', interpolation='None')
-        ax.set_title('Differential image')
-
-    pts = np.array(plt.ginput(n=0, timeout=0, show_clicks=True))
-    if mean_fig == 1:
-        pts_new = point1.localmax(mean_I, pts, ax, fig2)
-        pts_new = point1.localmax(mean_I, pts_new, ax, fig2)
-        pts_new = point1.localmax(mean_I, pts_new, ax, fig2)
-    elif mean_fig == 2:
-        pts_new = point1.localmax(logmean_I, pts, ax, fig2)
-        pts_new = point1.localmax(logmean_I, pts_new, ax, fig2)
-        pts_new = point1.localmax(logmean_I, pts_new, ax, fig2)
-    else:
-        pts_new = point1.localmax(diff_I, pts, ax, fig2)
-        pts_new = point1.localmax(diff_I, pts_new, ax, fig2)
-        pts_new = point1.localmax(diff_I, pts_new, ax, fig2)
-    ax.plot(pts[:,0], pts[:,1], 'r+')
-    pts_bg = pts_new-displacement
-ax.set_xlim(0, col)
-ax.set_ylim(row, 0)
-ax.plot((pts_new[:,0]-scan_l, pts_new[:,0]-scan_l, pts_new[:,0]+scan_l, pts_new[:,0]+scan_l,pts_new[:,0]-scan_l),
-        (pts_new[:,1]+scan_w, pts_new[:,1]-scan_w, pts_new[:,1]-scan_w, pts_new[:,1]+scan_w,pts_new[:,1]+scan_w), '-+', color='b')
-ax.plot((pts_bg[:,0]-scan_l, pts_bg[:,0]-scan_l, pts_bg[:,0]+scan_l, pts_bg[:,0]+scan_l,pts_bg[:,0]-scan_l),
-        (pts_bg[:,1]+bg_scan, pts_bg[:,1]-bg_scan, pts_bg[:,1]-bg_scan, pts_bg[:,1]+bg_scan,pts_bg[:,1]+bg_scan), '-+', color='c', alpha=0.5)
-fig2.canvas.draw()
 #%%
 """
-Extract spectra and background around points of interest (QD); Background correction
+Extract spectrum
 """
+movie_mean = np.mean(movie, axis=0)
+spec = np.mean(movie, axis=1)
+Von_spec = np.array([spec[i,:] for i in range(frame_start, frame) if i%2==1])
+Voff_spec = np.array([spec[i,:] for i in range(frame_start, frame) if i%2==0])
+Von_spec_mean = np.mean(Von_spec, axis=0)
+Voff_spec_mean = np.mean(Voff_spec, axis=0)
+Von_peaks = np.sum(Von_spec*x_lambda, axis=1)/np.sum(Von_spec, axis=1)
+Voff_peaks = np.sum(Voff_spec*x_lambda, axis=1)/np.sum(Voff_spec, axis=1)
+
+fig2, ax = plt.subplots(5,1, sharex=True)
+ax[0] = plt.subplot2grid((5,1), (0,0), rowspan=4)
+ax[1] = plt.subplot2grid((5,1), (4,0), rowspan=1, sharex=ax[0])
+ax[0].imshow(movie_mean, cmap='gray', interpolation='None')
+ax[1].plot(Von_spec_mean, 'r')
+ax[1].plot(Voff_spec_mean, 'b')
+ax[0].set_title('Mean image')
+ax[0].set_xlim(0,512)
+ax[1].set_xlabel('Pixels')
+ax[1].set_ylabel('Intensity')
+fig2.canvas.draw()
+
+fig3, ax = plt.subplots(2,1)
+ax[0].plot(x_lambda, Von_spec_mean-Voff_spec_mean)
+ax[0].set_title('Von-Voff')
+ax[0].set_ylabel('Differential intensity ')
+counts, bins, patches = ax[1].hist(Voff_peaks, bins=20, histtype='stepfilled',color='b', alpha=0.2, label='Voff')
+counts, bins, patches = ax[1].hist(Von_peaks, bins=bins, histtype='stepfilled',color='r', alpha=0.2, label='Von')
+ax[1].set_xticks(bins)
+ax[1].set_xticklabels(bins, rotation=45)
+ax[1].xaxis.set_major_formatter(FormatStrFormatter('%0.1f'))
+ax[1].set_title('Peak "center of mass"')
+ax[1].set_ylabel('Counts')
+ax[1].set_xlabel('Wavelength (nm)')
+fig3.tight_layout()
+'''
+def findparticle(image):
+    pts = []
+    for i in np.arange(scan_w,data[1]-scan_w,1, dtype='int'):
+        for j in np.arange(scan_l,data[2]-scan_l,1, dtype='int'):
+            if image[i,j] == np.max(image[(i-scan_w):(i+scan_w),(j-scan_l):(j+scan_l)]):
+                #if (np.sum(image[(i-1):(i+2),(j-1):(j+2)])-image[i,j])/8 > (np.sum(image[(i-2):(i+3),(j-2):(j+3)])-np.sum(image[(i-1):(i+2),(j-1):(j+2)]))/16:
+                if np.mean(image[(i-scan_w):(i+scan_w),(j-scan_l):(j+scan_l)]) > np.mean(image)+1*np.std(image):
+                    pt = [i,j]
+                    pts = np.append(pts, pt)
+    return np.reshape(pts,[len(pts)/2,2])
+
+pts = findparticle(movie_mean)
+for i in range(len(pts[:,0])):
+    ax[0].plot(pts[i,1],pts[i,0], 'b+')
+ax[0].set_xlim(0, data[2])
+ax[0].set_ylim(data[1], 0)
+fig2.canvas.draw()
+
+pts_new = pts
+pts_bg = pts_new-displacement
+x_frame = np.arange(0,frame,1)
+
 boxmovie = np.zeros((frame, 2*scan_w, 2*scan_l, len(pts)))
 bgmovie = np.zeros((frame, 2*bg_scan, 2*scan_l, len(pts)))
 fig3, ax = plt.subplots(len(pts)*4, sharex=True, sharey=False)
@@ -184,8 +186,8 @@ fig3.canvas.draw()
 """
 Extract Von and Voff spectra and fit Gaussian
 """
-#import seaborn as sns
-#sns.set(style="whitegrid", palette="pastel", color_codes=True)
+import seaborn as sns
+sns.set(style="whitegrid", palette="pastel", color_codes=True)
 def gauss(x, A, mu, sigma, slope, b):
     return A*np.exp(-(x-mu)**2/(2.*sigma**2))+slope*x+b
 dL = {}
@@ -222,9 +224,9 @@ for n in range(len(pts)):
     dL['NR#{}'.format(n)] = deltaL
     ax[n].plot(x, Von_specm, 'r.', label='Von Data')
     ax[n].plot(x, Voff_specm, 'b.', label='Voff Data')
-    ax[n].plot(x, gauss(x, result1.best_values['A'], result1.best_values['mu'], result1.best_values['sigma'], result1.best_values['slope'], result1.best_values['b']), '-', label='Von ({} nm)'.format(round(result1.best_values['mu'],3)), color='r')
-    ax[n].plot(x, gauss(x, result2.best_values['A'], result2.best_values['mu'], result2.best_values['sigma'], result2.best_values['slope'], result2.best_values['b']), '-', label='Voff ({} nm)'.format(round(result2.best_values['mu'],3)), color='b')
-    ax[n].annotate('$\Delta$$\lambda$ = {} nm'.format(round(deltaL,3)), xy=(1,1), xytext=(0.02,0.9), xycoords='axes fraction', fontsize=12)
+    #ax[n].plot(x, gauss(x, result1.best_values['A'], result1.best_values['mu'], result1.best_values['sigma'], result1.best_values['slope'], result1.best_values['b']), '-', label='Von ({} nm)'.format(round(result1.best_values['mu'],3)), color='r')
+    #ax[n].plot(x, gauss(x, result2.best_values['A'], result2.best_values['mu'], result2.best_values['sigma'], result2.best_values['slope'], result2.best_values['b']), '-', label='Voff ({} nm)'.format(round(result2.best_values['mu'],3)), color='b')
+    #ax[n].annotate('$\Delta$$\lambda$ = {} nm'.format(round(deltaL,3)), xy=(1,1), xytext=(0.02,0.9), xycoords='axes fraction', fontsize=12)
     ax[n].legend(bbox_to_anchor=(1, 1), frameon=False, fontsize=10)
     ax[n].set_xlabel('Wavelength (nm)')
     ax[n].set_ylabel('Intensity')
@@ -232,8 +234,8 @@ for n in range(len(pts)):
 #%%
 fig5, ax = plt.subplots(len(pts), squeeze=True)
 for n in range(len(pts)):
-    Vonn, bins, patches = ax[n].hist(d['Von peak position, NR#{}'.format(n)], bins=50, range=wavelength_range, histtype='stepfilled', alpha=0.5, label='Von', color='r')
-    Voffn, bins, patches = ax[n].hist(d['Voff peak position, NR#{}'.format(n)], bins=bins, range=wavelength_range, histtype='stepfilled', alpha=0.5, label='Voff', color='b')
+    Vonn, bins, patches = ax[n].hist(d['Von peak position, NR#{}'.format(n)], bins=50, histtype='stepfilled', alpha=0.5, label='Von', color='r')
+    Voffn, bins, patches = ax[n].hist(d['Voff peak position, NR#{}'.format(n)], bins=50, histtype='stepfilled', alpha=0.5, label='Voff', color='b')
 
 #%%
 if savefig ==1:
@@ -251,3 +253,4 @@ f.close()
 #worksheet.write_string(0, 0, 'dL ')
 #for n in range(len(dL)):
 #    worksheet.write(n+1, 0, dL[n])
+'''
