@@ -13,21 +13,24 @@ import lmfit
 Import files
 """
 #filePath='E:/NPLs spectrum/150522/'
-filePath = '/Users/yungkuo/Google Drive/032816 ONT QD wide field/raw data/with 0.731MOhm resistor 20x/'
-fileName = '-1.2V-13.2V'
+filePath = '/Users/yungkuo/Google Drive/033116 ONT QD wide field/'
+fileName = '-400mV-60.4V_2'
 """
 Import movie; Define parameters
 """
+frame_start = 2
+dt = 1./8.
+savefig = 0
+
 datapath = filePath+fileName
 tiffimg = tff.TiffFile(datapath+'.tif')
 data = tiffimg.asarray().shape
 frame = data[0]
 movie = tiffimg.asarray()
-frame_start = 2
-dt = 1/8
 movie[0:frame_start,:,:] = np.zeros((data[1], data[2]))
+movie = np.transpose(movie, (0, 2, 1))[:,:,:]
 x_lambda = np.arange(0,data[2],1)
-savefig = 0
+T = np.arange(0,(frame-frame_start)*dt,dt)
 """
 Extract spectrum
 """
@@ -39,7 +42,19 @@ Von_spec_mean = np.mean(Von_spec, axis=0)
 Voff_spec_mean = np.mean(Voff_spec, axis=0)
 Von_peaks = np.sum(Von_spec*x_lambda, axis=1)/np.sum(Von_spec, axis=1)
 Voff_peaks = np.sum(Voff_spec*x_lambda, axis=1)/np.sum(Voff_spec, axis=1)
+peaks = np.sum(spec*x_lambda, axis=1)/np.sum(spec, axis=1)
+#%%
+fig1, ax = plt.subplots()
+ax.plot(T[::2], Voff_peaks, 'b.')
+ax.plot(T[::2]+dt, Von_peaks, 'r.')
+ax.plot(np.append(np.zeros(frame_start), T), peaks, c='0.7')
 
+fig1, ax = plt.subplots()
+ax.plot(np.append(np.zeros(frame_start), T), np.mean(spec, axis=1), c='0.7')
+ax.plot(T[::2], np.mean(Voff_spec, axis=1), 'b.')
+ax.plot(T[::2]+dt, np.mean(Von_spec, axis=1), 'r.')
+ax.set_ylim(105,110)
+#%%
 fig2, ax = plt.subplots(6,1, figsize=(8,18), sharex=True)
 ax[0] = plt.subplot2grid((5,1), (0,0), rowspan=3)
 ax[1] = plt.subplot2grid((5,1), (3,0), rowspan=1, sharex=ax[0])
@@ -66,6 +81,15 @@ ax.set_title('Peak "center of mass"')
 ax.set_ylabel('Counts')
 ax.set_xlabel('Wavelength (nm)')
 fig3.tight_layout()
+#%%
+scan_w = 3
+scan_l = 35
+extent = [0,frame,0,scan_l*2]
+boxmovie = movie[:,302-scan_w:302+scan_w,189-scan_l:189+scan_l]
+fig, ax = plt.subplots(figsize=(30,2))
+ax.imshow((np.reshape(boxmovie[:,:,:], (frame*(2*scan_w),2*scan_l)).T), cmap='afmhot',
+           vmin=np.min(boxmovie[:,:,:]), vmax=np.max(boxmovie[:,:,:]), extent=extent,
+            aspect ='auto', interpolation='None')
 
 #%%
 """

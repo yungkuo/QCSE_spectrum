@@ -21,8 +21,8 @@ def x_lambda(lamp, c1, c2, c3, plot, x):
     # lamp, c1, c2, c3 are filepath of the calibration tif figures
     # if plot == 1: plot the lamp, c1, c2, c3 figures; else: no plot
     # x: pixel coordinates
-    pixel_mean = [50,230]
-    pixel_bg = [456,512]
+    pixel_mean = [200,512]
+    pixel_bg = [0,150]
     print 'pixels taken to calculate transmittance intensity:{}'.format(pixel_mean)
     print 'pixels taken to calculate background:{}'.format(pixel_bg)
 
@@ -57,12 +57,12 @@ def x_lambda(lamp, c1, c2, c3, plot, x):
     c2ds = movingaverage(c2d, window_size)
     c3ds = movingaverage(c3d, window_size)
     slope_max = np.zeros((6,2))
-    slope_max[0,0] = int(*np.where(c1ds == np.max(c1ds[300:400])))
-    slope_max[1,0] = int(*np.where(c1ds == np.min(c1ds[300:400])))
-    slope_max[2,0] = int(*np.where(c2ds == np.max(c2ds[200:320])))
-    slope_max[3,0] = int(*np.where(c2ds == np.min(c2ds[200:320])))
-    slope_max[4,0] = int(*np.where(c3ds == np.max(c3ds[200:300])))
-    slope_max[5,0] = int(*np.where(c3ds == np.min(c3ds[200:300])))
+    slope_max[0,0] = int(*np.where(c1ds == np.max(c1ds[150:250])))
+    slope_max[1,0] = int(*np.where(c1ds == np.min(c1ds[150:250])))
+    slope_max[2,0] = int(*np.where(c2ds == np.max(c2ds[50:170])))
+    slope_max[3,0] = int(*np.where(c2ds == np.min(c2ds[50:170])))
+    slope_max[4,0] = int(*np.where(c3ds == np.max(c3ds[50:170])))
+    slope_max[5,0] = int(*np.where(c3ds == np.min(c3ds[50:170])))
     slope_max[:,1] = [530,500,630,550,620,580]
     print slope_max
     y = slope_max[:, 0]
@@ -97,7 +97,7 @@ def x_lambda(lamp, c1, c2, c3, plot, x):
     def objective(p):
         return ((polynomial(p, y)-slope_max[:, 1])**2).sum()
 
-    cons = (dict(type='ineq', fun=constraint_2nd_der))
+    cons = (dict(type='ineq', fun=constraint_1st_der))
     res = opt.minimize(objective, x0=np.array([-1.0, -1.0, -1.0]), method='SLSQP', constraints=cons)
     if res.success:
         pars = res.x

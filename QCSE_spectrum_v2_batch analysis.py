@@ -14,13 +14,13 @@ from sub import point1, lambda_cali_v2
 #from scipy.ndimage.filters import gaussian_filter1d
 #from scipy.optimize import curve_fit
 import lmfit
-#import pandas as pd
+import pandas as pd
 """
 Import files
 """
 #filePath='E:/NPLs spectrum/150522/'
-filePath = '/Users/yungkuo/Google Drive/030916 869B/'
-fileName = '869B_015'
+filePath = '/Users/yungkuo/Google Drive/040416 869B Zn coated/'
+fileName = '015'
 c1 = '510.20.tif'
 c2 = '590.80.tif'
 c3 = '600.40.tif'
@@ -28,18 +28,20 @@ lamp = 'lamp.tif'
 """
 Control panel
 """
-wavelength_range = (550,650)
+wavelength_range = (500,650)
 framerate = 8       # in unit of Hz
 frame_start = 2
-frame_stop = 300
+frame_stop = 0    # if =0, frame_stop = last frame
 scan_w = 3          # extract scan_w*2 pixels in width(perpendicular to spectral diffusion line) around QD
 scan_l = 25         # extract scan_l*2 pixels in length = spectral width
 plot_cali = 0
 playmovie = 0       # 1 = Yes, play movie, else = No, don't play
-mean_fig = 2        # 1 = display mean movie image, 2 = display mean(log) image, else = display differencial image
+mean_fig = 1        # 1 = display mean movie image, 2 = display mean(log) image, else = display differencial image
+findparticle_nstd = 1 # box mean > image[boundary].mean + findparticle_nstd * image[boundary].std is considered a particle
 iterations_to_find_threshold = 0
 nstd = 1.5            # set blinking threshold to mean(blink off)+std(blink off)*nstd
-savefig = 1         # 1 = Yes, save figures, else = No, don't save
+fit_gauss = 0      #1: fit Gaussian to averaged spectrum, else: fit polynomial, degree = 9
+savefig = 0         # 1 = Yes, save figures, else = No, don't save
 #%%
 """
 Import movie; Define parameters
@@ -51,6 +53,9 @@ frame = data[0]
 movie = tiffimg.asarray()
 dt = 1/framerate
 movie[0:frame_start,:,:] = np.zeros((data[1], data[2]))
+if frame_stop != 0:
+    movie = movie[0:frame_stop,:,:]
+    frame = frame_stop
 x = np.arange(0,data[2],1)
 x_frame = np.arange(0,frame,1)
 #%%
@@ -67,8 +72,8 @@ def find_nearest(array,value):
     idx = (np.abs(array-value)).argmin()
     return idx
 boundary = np.zeros(2)
-boundary[0] = (find_nearest(x_lambda, wavelength_range[0]))
-boundary[1] = (find_nearest(x_lambda, wavelength_range[1]))
+boundary[0] = (find_nearest(x_lambda[0:300], wavelength_range[0]))
+boundary[1] = (find_nearest(x_lambda[0:300], wavelength_range[1]))
 #%%
 """
 Play movie
@@ -91,7 +96,7 @@ def findparticle(image, boundary):
         for j in np.arange(boundary[1],boundary[0],1, dtype='int'):
             if image[i,j] == np.max(image[(i-scan_w):(i+scan_w),(j-scan_l):(j+scan_l)]):
                 #if (np.sum(image[(i-1):(i+2),(j-1):(j+2)])-image[i,j])/8 > (np.sum(image[(i-2):(i+3),(j-2):(j+3)])-np.sum(image[(i-1):(i+2),(j-1):(j+2)]))/16:
-                if np.mean(image[(i-scan_w):(i+scan_w),(j-scan_l):(j+scan_l)]) > np.mean(image[:,boundary[1]:boundary[0]])-1*np.std(image[:,boundary[1]:boundary[0]]):
+                if np.mean(image[(i-scan_w):(i+scan_w),(j-scan_l):(j+scan_l)]) > np.mean(image[:,boundary[1]:boundary[0]])+findparticle_nstd*np.std(image[:,boundary[1]:boundary[0]]):
                     pt = [j,i]
                     pts = np.append(pts, pt)
     return np.reshape(pts,[len(pts)/2,2])
@@ -142,11 +147,13 @@ for n in range(len(pts)):
 tt = np.mean(spectra_bgcr, axis=1)
 std = np.std(tt[frame_start:,:],axis=0,ddof=1,dtype='d')
 threshold = np.mean(tt[frame_start:,:], axis=0)-std/2
+dL = pd.Series()
 
-def gauss(x, A, mu, sigma, slope, b):
-    return A*np.exp(-(x-mu)**2/(2.*sigma**2))+slope*x+b
-dL = {}
-
+if fit_gauss == 1:
+    def gauss(x, A, mu, sigma, slope, b):
+        return A*np.exp(-(x-mu)**2/(2.*sigma**2))+slope*x+b
+else:
+    from lmfit.models import PolynomialModel
 
 extent = [0,frame,0,scan_l*2]
 for n in range(len(pts)):
@@ -169,24 +176,37 @@ for n in range(len(pts)):
     Poff = np.sum(Voff_spec*x, axis=1)/np.sum(Voff_spec,axis=1)
     Von_specm = np.mean(Von_spec, axis=0)
     Voff_specm = np.mean(Voff_spec, axis=0)
-    slope1 = (np.mean(Von_specm[scan_l*2-scan_l*2/10:])-np.mean(Von_specm[:scan_l*2/10]))/(x.max()-x.min())
-    slope2 = (np.mean(Voff_specm[scan_l*2-scan_l*2/10:])-np.mean(Voff_specm[:scan_l*2/10]))/(x.max()-x.min())
-    gmod = lmfit.Model(gauss)
-    params1 = gmod.make_params()
-    params1['A'].set(value=np.max(Von_specm), min=0)
-    params1['mu'].set(value=x_lambda[pts[n,0]-scan_l+int(*np.where(Von_specm == Von_specm.max())[0])], min=400, max=800)
-    params1['sigma'].set(value=8, max=100)
-    params1['slope'].set(value=slope1)
-    params1['b'].set(value=np.min(Von_specm))
-    params2 = gmod.make_params()
-    params2['A'].set(value=np.max(Voff_specm), min=0)
-    params2['mu'].set(value=x_lambda[pts[n,0]-scan_l+int(*np.where(Voff_specm == Voff_specm.max()))], min=400, max=800)
-    params2['sigma'].set(value=8, max=100)
-    params1['slope'].set(value=slope2)
-    params1['b'].set(value=np.min(Voff_specm))
-    result1 = gmod.fit(Von_specm, x=x, **params1)
-    result2 = gmod.fit(Voff_specm, x=x, **params2)
-    deltaL = result1.best_values['mu']-result2.best_values['mu']
+
+    if fit_gauss == 1:
+        gmod = lmfit.Model(gauss)
+        slope1 = (np.mean(Von_specm[scan_l*2-scan_l*2/10:])-np.mean(Von_specm[:scan_l*2/10]))/(x.max()-x.min())
+        slope2 = (np.mean(Voff_specm[scan_l*2-scan_l*2/10:])-np.mean(Voff_specm[:scan_l*2/10]))/(x.max()-x.min())
+        params1 = gmod.make_params()
+        params1['A'].set(value=np.max(Von_specm), min=0)
+        params1['mu'].set(value=x_lambda[pts[n,0]-scan_l+int(*np.where(Von_specm == Von_specm.max())[0])], min=400, max=800)
+        params1['sigma'].set(value=8, max=100)
+        params1['slope'].set(value=slope1)
+        params1['b'].set(value=np.min(Von_specm))
+        params2 = gmod.make_params()
+        params2['A'].set(value=np.max(Voff_specm), min=0)
+        params2['mu'].set(value=x_lambda[pts[n,0]-scan_l+int(*np.where(Voff_specm == Voff_specm.max()))], min=400, max=800)
+        params2['sigma'].set(value=8, max=100)
+        params1['slope'].set(value=slope2)
+        params1['b'].set(value=np.min(Voff_specm))
+        result1 = gmod.fit(Von_specm, x=x, **params1)
+        result2 = gmod.fit(Voff_specm, x=x, **params2)
+        fitpeak1 = result1.best_values['mu']
+        fitpeak2 = result2.best_values['mu']
+        deltaL = fitpeak1 -fitpeak2
+    else:
+        mod = PolynomialModel(7)
+        pars1 = mod.guess(Von_specm, x=x)
+        pars2 = mod.guess(Voff_specm, x=x)
+        result1 = mod.fit(Von_specm, pars1, x=x)
+        result2 = mod.fit(Voff_specm, pars2, x=x)
+        fitpeak1 = x[np.where(result1.best_fit == np.max(result1.best_fit))]
+        fitpeak2 = x[np.where(result2.best_fit == np.max(result2.best_fit))]
+        deltaL = fitpeak1 -fitpeak2
     dL['NR#{}'.format(n)] = deltaL
 
     fig3, ax = plt.subplots(2,5, figsize=(18,5))
@@ -209,29 +229,30 @@ for n in range(len(pts)):
 
     ax[0,4].plot(x, Von_specm, 'r.')#, label='Von data')
     ax[0,4].plot(x, Voff_specm, 'b.')#, label='Voff data')
-    ax[0,4].plot(x, result1.best_fit, '-', label='Von ({} nm)'.format(round(result1.best_values['mu'],3)), color='r')
-    ax[0,4].plot(x, result2.best_fit, '-', label='Voff ({} nm)'.format(round(result2.best_values['mu'],3)), color='b')
-    ax[0,4].annotate('$\Delta$$\lambda$ = {} nm'.format(round(deltaL,3)), xy=(1,1), xytext=(0.02,1.02), xycoords='axes fraction', fontsize=12)
-    ax[0,4].legend(bbox_to_anchor=(1.2, 1.2), frameon=False, fontsize=10)
+    ax[0,4].plot(x, result1.best_fit, '-', label='Von ({} nm)'.format(round(fitpeak1,3)), color='r')
+    ax[0,4].plot(x, result2.best_fit, '-', label='Voff ({} nm)'.format(round(fitpeak2,3)), color='b')
+    ax[0,4].annotate('$\Delta$$\lambda$ = {} nm'.format(round(deltaL,3)), xy=(1,1), xytext=(0.02,1.05), xycoords='axes fraction', fontsize=12)
+    ax[0,4].legend(bbox_to_anchor=(1.8, 1.2), frameon=False, fontsize=10)
     ax[0,4].set_xlabel('Wavelength (nm)')
     ax[0,4].set_ylabel('Intensity')
     plt.subplots_adjust(hspace = 0.5, wspace = 0.5)
 
-    counts, bins, patches = ax[1,4].hist(Pon, bins=50, range=(x.min(), x.max()), histtype='stepfilled', alpha=0.5, label='Von', color='r')
+    #, range=(x.min(), x.max())
+    counts, bins, patches = ax[1,4].hist(Pon, bins=50, histtype='stepfilled', alpha=0.5, label='Von', color='r')
     counts, bins, patches = ax[1,4].hist(Poff, bins=bins, histtype='stepfilled', alpha=0.5, label='Voff', color='b')
     ax[1,4].legend(bbox_to_anchor=(1, 1), frameon=False, fontsize=10)
     fig3.canvas.draw()
     if savefig ==1:
-        fig3.savefig(filePath+'results/'+fileName+' result{}.pdf'.format(n), format='pdf', bbox_inches = 'tight')
+        fig3.savefig(filePath+'results/batch analysis/'+fileName+' result{}.pdf'.format(n), format='pdf', bbox_inches = 'tight')
 #%%
 if savefig ==1:
-    fig1.savefig(filePath+'results/'+'calibration.pdf', format='pdf',bbox_inches = 'tight')
-    fig2.savefig(filePath+'results/'+fileName+'_QD selection.pdf', format='pdf', bbox_inches = 'tight')
+    fig1.savefig(filePath+'results/batch analysis/'+'calibration.pdf', format='pdf',bbox_inches = 'tight')
+    fig2.savefig(filePath+'results/batch analysis/'+fileName+'_QD selection.pdf', format='pdf', bbox_inches = 'tight')
     #fig4.savefig(filePath+'results/'+fileName+abc+'.fig4_spec.pdf', format='pdf', bbox_inches = 'tight')
     #fig5.savefig(filePath+'results/'+fileName+abc+'.fig5_pp hist.pdf', format='pdf', bbox_inches = 'tight')
 print dL
-f = open(filePath+'_result.txt','a')
-f.write('{},'.format(fileName)+'{}\n'.format(dL)) # python will convert \n to os.linesep
+f = open(filePath+'results/batch analysis/'+'_result.txt','a')
+f.write('{},'.format(fileName)+'\n{}\n'.format(dL)) # python will convert \n to os.linesep
 f.close()
 #workbook = xlsxwriter.Workbook(filePath+'{}_dL.xlsx'.format(fileName))
 #worksheet = workbook.add_worksheet()
