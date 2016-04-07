@@ -20,7 +20,7 @@ Import files
 """
 #filePath='E:/NPLs spectrum/150522/'
 filePath = '/Users/yungkuo/Google Drive/040416 869B Zn coated/'
-fileName = '005'
+fileName = '007'
 c1 = '510.20.tif'
 c2 = '590.80.tif'
 c3 = '600.40.tif'
@@ -28,7 +28,7 @@ lamp = 'lamp.tif'
 """
 Control panel
 """
-wavelength_range = (500,645)
+wavelength_range = (520,630)
 framerate = 8.       # in unit of Hz
 frame_start = 2
 frame_stop = 0    # if =0, frame_stop = last frame
@@ -146,8 +146,8 @@ for n in range(len(pts)):
     boxmovie[:,:,:,n] = point1.mask3d(movie, pts[n,:], scan_w, scan_l)
     spectra_bgcr[:,:,n] = np.mean(boxmovie[:,:,:,n], axis=1)-np.array(bg[:,pts[n,0]-scan_l:pts[n,0]+scan_l])
 tt = np.mean(spectra_bgcr, axis=1)
-std = np.std(tt[frame_start:,:],axis=0,ddof=1,dtype='d')
-threshold = np.mean(tt[frame_start:,:], axis=0)-std/2
+#std = np.std(tt[frame_start:,:],axis=0,ddof=1,dtype='d')
+threshold = np.mean(tt[frame_start:,:], axis=0)
 dL = pd.Series()
 
 if fit_gauss == 1:
@@ -158,15 +158,15 @@ else:
 
 extent = [0,frame,0,scan_l*2]
 for n in range(len(pts)):
-    on_mean = np.mean([tt[i,n] for i in range(frame_start,frame) if tt[i,n] > threshold[n]], axis=0)
-    on_std = np.std([tt[i,n] for i in range(frame_start,frame) if tt[i,n] > threshold[n]], axis=0, ddof=1,dtype='d')
-    threshold1 = on_mean - on_std*nstd
+    off_mean = np.mean([tt[i,n] for i in range(frame_start,frame) if tt[i,n] < threshold[n]], axis=0)
+    off_std = np.std([tt[i,n] for i in range(frame_start,frame) if tt[i,n] < threshold[n]], axis=0, ddof=1,dtype='d')
+    threshold1 = off_mean + off_std*nstd
     for i in range(iterations_to_find_threshold):
         if threshold1 != threshold[n]:
             threshold[n] = threshold1
-            on_mean = np.mean([tt[i,n] for i in range(frame_start,frame) if tt[i,n] > threshold[n]], axis=0)
-            on_std = np.std([tt[i,n] for i in range(frame_start,frame) if tt[i,n] > threshold[n]], axis=0, ddof=1,dtype='d')
-            threshold1 = on_mean - on_std*nstd
+            off_mean = np.mean([tt[i,n] for i in range(frame_start,frame) if tt[i,n] < threshold[n]], axis=0)
+            off_std = np.std([tt[i,n] for i in range(frame_start,frame) if tt[i,n] < threshold[n]], axis=0, ddof=1,dtype='d')
+            threshold1 = off_mean + off_std*nstd
             #print threshold[n]
             #ax[1].axhline(y = threshold[n], c='0.3', alpha=0.1)
 
@@ -215,9 +215,9 @@ for n in range(len(pts)):
     fig3, ax = plt.subplots(3,5, figsize=(18,5))
     ax[0,0] = plt.subplot2grid((3,5), (0,0), colspan=4, rowspan=1)
     ax[1,0] = plt.subplot2grid((3,5), (1,0), colspan=4, rowspan=1, sharex=ax[0,0])
-    ax[2,0] = plt.subplot2grid((3,5), (2,0), colspan=4, rowspan=1, sharey=ax[2,4])
+    ax[2,0] = plt.subplot2grid((3,5), (2,0), colspan=4, rowspan=1)
     ax[0,4] = plt.subplot2grid((3,5), (0,4), colspan=1, rowspan=1)
-    ax[2,4] = plt.subplot2grid((3,5), (2,4), colspan=1, rowspan=1, sharex=ax[0,1])
+    ax[2,4] = plt.subplot2grid((3,5), (2,4), colspan=1, rowspan=1, sharex=ax[0,1], sharey=ax[2,0])
 
     ax[0,0].imshow((np.reshape(boxmovie[:,:,:,n], (frame*(2*scan_w),2*scan_l)).T), cmap='afmhot', vmin=np.min(boxmovie[:,:,:,n]), vmax=np.max(boxmovie[:,:,:,n]), extent=extent, aspect ='auto', interpolation='None')
     #ax[1].plot(x_frame, np.mean(np.mean(boxmovie[:,:,:,n], axis=1), axis=1), 'b', label='NR intensity')
@@ -235,13 +235,14 @@ for n in range(len(pts)):
     ax[2,0].plot(Ton, Pon, 'r.')
     ax[2,0].plot(T, P, c='0.7')
     ax[2,0].set_xlim(0,T.max())
+    ax[2,0].set_ylim(np.min(np.append(Poff, Pon)), np.max(np.append(Poff, Pon)))
 
     ax[0,4].plot(x, Von_specm, 'r.')#, label='Von data')
     ax[0,4].plot(x, Voff_specm, 'b.')#, label='Voff data')
     ax[0,4].plot(x, result1.best_fit, '-', label='Von ({} nm)'.format(round(fitpeak1,3)), color='r')
     ax[0,4].plot(x, result2.best_fit, '-', label='Voff ({} nm)'.format(round(fitpeak2,3)), color='b')
     ax[0,4].annotate('$\Delta$$\lambda$ = {} nm'.format(round(deltaL,3)), xy=(1,1), xytext=(0.02,1.05), xycoords='axes fraction', fontsize=12)
-    ax[0,4].legend(bbox_to_anchor=(1.8, 1.2), frameon=False, fontsize=10)
+    ax[0,4].legend(bbox_to_anchor=(1.9, 1.2), frameon=False, fontsize=10)
     ax[0,4].set_xlabel('Wavelength (nm)')
     ax[0,4].set_ylabel('Intensity')
     plt.subplots_adjust(hspace = 0.5, wspace = 0.5)
@@ -249,7 +250,7 @@ for n in range(len(pts)):
     #, range=(x.min(), x.max())
     counts, bins, patches = ax[2,4].hist(Pon, bins=50, histtype='stepfilled', orientation='horizontal', alpha=0.5, label='Von', color='r')
     counts, bins, patches = ax[2,4].hist(Poff, bins=bins, histtype='stepfilled', orientation='horizontal', alpha=0.5, label='Voff', color='b')
-    ax[2,4].legend(bbox_to_anchor=(1, 1), frameon=False, fontsize=10)
+    ax[2,4].legend(bbox_to_anchor=(1.3, 1), frameon=False, fontsize=10)
     fig3.canvas.draw()
     if savefig ==1:
         fig3.savefig(filePath+'results/batch analysis/'+fileName+' result{}.pdf'.format(n), format='pdf', bbox_inches = 'tight')
