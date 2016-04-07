@@ -10,8 +10,8 @@ import matplotlib.pyplot as plt
 import scipy.optimize as opt
 import libtiff
 
-def polynomial(p, y):
-    return p[0]+p[1]*y+p[2]*y**2
+def polynomial(p0, p1, p2, y):
+    return p0+p1*y+p2*y**2
 
 def movingaverage(interval, window_size):
     window = np.ones(int(window_size))/float(window_size)
@@ -90,6 +90,17 @@ def x_lambda(lamp, c1, c2, c3, plot, x):
         ax[2].axvline(x=slope_max[i, 0], color='0.7')
     ax[2].plot(y, slope_max[:, 1], 'ro')
     ax[2].set_ylabel('Wavelength (nm)')
+
+    from lmfit.models import QuadraticModel
+    mod = QuadraticModel()
+    params = mod.make_params(a=-1.0, b=-1.0, c=-1.0)
+    result = mod.fit(slope_max[:, 1], x=y, **params)
+    p = result.eval(x=x)
+    ax[2].plot(x, p, '-')
+    ax[2].set_ylim(400, 800)
+    ax[2].set_xlabel('Pixel')
+    return p, fig
+'''
     def constraint_1st_der(p):
         return p[1]+2*p[2]*y
     def constraint_2nd_der(p):
@@ -109,3 +120,4 @@ def x_lambda(lamp, c1, c2, c3, plot, x):
     else:
         print 'Failed'
     return p, fig
+ '''

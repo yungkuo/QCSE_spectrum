@@ -250,10 +250,10 @@ if savefig ==1:
     fig2.savefig(filePath+'results/batch analysis/'+fileName+'_QD selection.pdf', format='pdf', bbox_inches = 'tight')
     #fig4.savefig(filePath+'results/'+fileName+abc+'.fig4_spec.pdf', format='pdf', bbox_inches = 'tight')
     #fig5.savefig(filePath+'results/'+fileName+abc+'.fig5_pp hist.pdf', format='pdf', bbox_inches = 'tight')
-print dL
-f = open(filePath+'results/batch analysis/'+'_result.txt','a')
-f.write('{},'.format(fileName)+'\n{}\n'.format(dL)) # python will convert \n to os.linesep
-f.close()
+    print dL
+    f = open(filePath+'results/batch analysis/'+'_result.txt','a')
+    f.write('{},'.format(fileName)+'\n{}\n'.format(dL)) # python will convert \n to os.linesep
+    f.close()
 #workbook = xlsxwriter.Workbook(filePath+'{}_dL.xlsx'.format(fileName))
 #worksheet = workbook.add_worksheet()
 #worksheet.write_string(0, 0, 'dL ')
